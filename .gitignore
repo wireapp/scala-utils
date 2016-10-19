@@ -1,0 +1,24 @@
+# Java class files
+*.class
+
+# OS X crap
+*.DS_Store
+
+# VIM crap
+.*.swp
+
+# generated files
+bin/
+gen/
+obj
+libs/armeabi
+ajcore.*.txt
+
+# Local configuration file (sdk path, etc)
+local.properties
+
+# Intellij module files
+*.iml
+
+.idea
+out/
