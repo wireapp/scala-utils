@@ -24,30 +24,24 @@ class SingleRequestClient(client: ClientEngine) {
     * another request with the since id being the latest Id anyway, so we'll get back an empty list from BE. We could
     * alternatively check the timestamps to avoid this unnecessary request, but it's really not a big deal.
     */
-  private var currentRequest = Future.successful((Seq.empty[NotId], false))
+  private var currentRequest = Future.successful((Option.empty[NotId], false))
 
   def loadNotifications(lastStableId: Option[NotId]): Future[Option[NotId]] = {
 
-    def loadNextPage(lastStableId: Option[NotId]): Future[(Seq[NotId], Boolean)] = {
+    def loadNextPage(lastStableId: Option[NotId]): Future[(Option[NotId], Boolean)] = {
       client.fetch(Request(since = lastStableId)).flatMap {
         case Right(Response(ns, hasMore)) =>
           onPageLoaded ! ns
           if (hasMore) loadNextPage(ns.lastOption)
-          else Future.successful(ns, false)
+          else Future.successful(ns.lastOption, false)
         case Left(ErrorResponse(code)) =>
           Logging.error(s"Load notifications failed with response: $code")
-          Future.successful(Seq.empty, false)
+          Future.successful(None, false)
       }
     }
 
-    currentRequest = if (currentRequest.isCompleted) loadNextPage(lastStableId).flatMap {
-      case (ns, hasMore) =>
-        if (hasMore) loadNextPage(ns.lastOption)
-        else Future.successful(ns, false)
-    }
-    else currentRequest
-
-    currentRequest.map { case (ns, _) => ns.lastOption }
+    currentRequest = if (currentRequest.isCompleted) loadNextPage(lastStableId) else currentRequest
+    currentRequest.map { case (ns, _) => ns }
   }
 }
 
