@@ -17,19 +17,19 @@
  */
 package com.wire.events
 
-import java.util.concurrent.{ConcurrentLinkedQueue, CountDownLatch, CyclicBarrier, TimeUnit}
 import java.util.concurrent.atomic.AtomicInteger
+import java.util.concurrent.{ConcurrentLinkedQueue, CountDownLatch, CyclicBarrier}
 
-import com.wire.threading.{SerialDispatchQueue, Threading, UiDispatchQueue}
+import com.wire.testutils.Implicits.{RichLatch, TestInt}
+import com.wire.testutils.TestSpec
+import com.wire.threading.{SerialDispatchQueue, Threading}
 import org.scalatest.{BeforeAndAfter, FeatureSpec, Matchers, OptionValues}
 
+import scala.collection.JavaConverters._
 import scala.concurrent.duration._
 import scala.concurrent.{Await, ExecutionContext, Future, blocking}
-import scala.collection.JavaConverters._
-import com.wire.testutils.Implicits.RichInt
-import com.wire.testutils.Implicits.RichLatch
 
-class SignalSpec extends FeatureSpec with Matchers with OptionValues with BeforeAndAfter {
+class SignalSpec extends TestSpec {
   import scala.concurrent.ExecutionContext.Implicits.global
 
   implicit val ec: EventContext = EventContext.Global
@@ -38,10 +38,6 @@ class SignalSpec extends FeatureSpec with Matchers with OptionValues with Before
   val capture = (value: Int) => received = received :+ value
 
   val eventContext = new EventContext() {}
-
-  Threading.setUiDispatchQueue(new UiDispatchQueue {
-    override def execute(runnable: Runnable): Unit = runnable.run()
-  })
 
   before {
     received = Seq[Int]()

@@ -17,11 +17,14 @@
  */
 package com.wire
 
+import java.util.Random
+import java.util.concurrent.atomic.AtomicReference
 import java.util.concurrent.{CountDownLatch, TimeUnit}
 
-import com.wire.events.Signal
+import com.wire.events.{Signal, SourceSignal}
 import com.wire.threading.Threading
 
+import scala.annotation.tailrec
 import scala.concurrent.Await
 import scala.concurrent.duration.{Duration, DurationLong}
 import scala.language.implicitConversions
@@ -36,7 +39,7 @@ package object testutils {
 
   object Implicits {
 
-    implicit class RichInt(val a: Int) extends AnyVal {
+    implicit class TestInt(val a: Int) extends AnyVal {
       def times(f: => Unit): Unit = {
         require(a >= 1, "number of times should be at least 1")
         (1 to a) foreach (_ => f)
@@ -45,6 +48,16 @@ package object testutils {
 
     implicit class RichLatch(val l: CountDownLatch) extends AnyVal {
       def awaitDefault() = l.await(duration.toMillis, TimeUnit.MILLISECONDS)
+    }
+
+    implicit class RichAtomicReference[V](val ref: AtomicReference[V]) extends AnyVal {
+      @tailrec
+      final def update(updater: V => V): V = {
+        val current = ref.get
+        val updated = updater(current)
+        if (ref.compareAndSet(current, updated)) updated
+        else ref.update(updater)
+      }
     }
   }
 
@@ -59,4 +72,17 @@ package object testutils {
     if (printVals) println("****")
   }
 
+  object Uncontended {
+    private val localRandom = new ThreadLocal[Random] {
+      override def initialValue: Random = new Random
+    }
+
+    def random: Random = localRandom.get
+  }
+
+  class IntSignal(v: Int = 0) extends SourceSignal[Int](Some(v)) {
+    var isWired = false
+    override protected def onWire(): Unit = isWired = true
+    override protected def onUnwire(): Unit = isWired = false
+  }
 }
