@@ -22,10 +22,13 @@ lazy val core = (project in file("core"))
   .dependsOn(macrosupport)
   .settings(
     libraryDependencies ++= Seq(
-      "org.scalatest" %% "scalatest" % "3.0.0" % "test",
       "ch.qos.logback" % "logback-classic" % "1.1.7",
       "com.typesafe.scala-logging" %% "scala-logging" % "3.4.0",
-      "org.threeten" % "threetenbp" % "1.3" % Provided
+      "org.threeten" % "threetenbp" % "1.3" % Provided,
+
+      //test dependencies
+      "org.scalatest" %% "scalatest" % "2.2.6" % "test", //scalamock 3.2.2 is incompatible with scalatest 3.0.0
+      "org.scalamock" %% "scalamock-scalatest-support" % "3.2.2" % "test"
     )
   )
 
