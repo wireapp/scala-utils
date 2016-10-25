@@ -4,11 +4,13 @@ import java.util.concurrent.CountDownLatch
 
 import com.wire.testutils.{RichLatch, TestSpec}
 import com.wire.threading.Threading
+import org.scalatest.Ignore
 import org.threeten.bp.Instant
 
 import scala.concurrent.{Await, Future}
 import scala.concurrent.duration._
 
+@Ignore
 class FutureSpec extends TestSpec {
 
   feature("Testing futures") {
@@ -24,8 +26,7 @@ class FutureSpec extends TestSpec {
       * Seems as though my understanding of futures could be stronger, especially when it comes to mapping/flatmapping
       * and using them in for-comprehensions
       */
-    //TODO disable playground tests
-    scenario("Starting futures on different threads") {
+    scenario("Starting futures on different threads - for loop") {
       implicit val ec = Threading.Background
 
       val latch = new CountDownLatch(2)
@@ -52,6 +53,48 @@ class FutureSpec extends TestSpec {
           latch.countDown()
         }
         uiFuture
+      }(Threading.Ui)
+
+      latch.awaitDuration(5.seconds) shouldEqual true
+      info(s"final res: ${Await.result(res, 5.seconds)}")
+    }
+
+    /**
+      * Note, according to this post: http://stackoverflow.com/questions/27454798/is-future-in-scala-a-monad
+      * Futures are not strictly monads, although they can be built like monads using for-comprehensions. This is
+      * basically because they cannot be substituted (or inlined) with their definition, which leads to some
+      * of the laws for monads being violated.
+      *
+      * Also, having to pass in execution contexts for map, flatmap, withFilter and foreach makes them very confusing.
+      */
+    scenario("Starting futures on different threads - translated out") {
+      implicit val ec = Threading.Background
+
+      val latch = new CountDownLatch(2)
+      def toDoOnUi = Future {
+        Thread.sleep(1000)
+        latch.countDown()
+        info(s"toDoOnUi at ${Instant.now()} running on ${Thread.currentThread().getName}")
+        5
+      }
+
+      def toDoOnBackground = Future {
+        Thread.sleep(2000)
+        info(s"toDoOnBackground at: ${Instant.now()} on ${Thread.currentThread().getName}")
+        10
+      }
+
+      val res = Future {
+//        val uiFuture = toDoOnUi
+
+        toDoOnBackground.foreach { background =>
+//          uiFuture.foreach { onUi =>
+            info(s"background: $background, onUi: ... on ${Thread.currentThread().getName}")
+            latch.countDown()
+//          }
+        }
+
+        toDoOnUi
       }(Threading.Ui)
 
       latch.awaitDuration(5.seconds) shouldEqual true
