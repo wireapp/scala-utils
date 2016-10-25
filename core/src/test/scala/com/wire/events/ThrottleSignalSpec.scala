@@ -21,7 +21,7 @@ import java.util.concurrent.atomic.AtomicReference
 
 import com.wire.testutils.{RichAtomicReference, TestInt}
 import com.wire.testutils.Uncontended.random
-import com.wire.testutils.{IntSignal, TestSpec}
+import com.wire.testutils.{IntSignal, FullFeatureSpec}
 import com.wire.threading.CancellableFuture.delayed
 import com.wire.threading.Threading
 import com.wire.utils.RichInstant
@@ -30,7 +30,7 @@ import org.threeten.bp.Instant
 import scala.concurrent.duration._
 import scala.concurrent.{Await, Future}
 
-class ThrottleSignalSpec extends TestSpec {
+class ThrottleSignalSpec extends FullFeatureSpec {
 
   feature("Forwarding") {
 

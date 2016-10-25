@@ -7,12 +7,12 @@ import com.wire.client.SingleRequestClient.NotId
 import com.wire.events.EventContext
 import com.wire.testutils.RichLatch
 import com.wire.testutils.Matchers.FutureSyntax
-import com.wire.testutils.TestSpec
+import com.wire.testutils.FullFeatureSpec
 import com.wire.threading.Threading
 
 import scala.concurrent.Future
 
-class SingleRequestClientSpec extends TestSpec {
+class SingleRequestClientSpec extends FullFeatureSpec {
 
   implicit val executionContext = Threading.Background
   implicit val eventContext = new EventContext {}

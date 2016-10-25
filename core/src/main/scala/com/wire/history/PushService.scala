@@ -12,8 +12,9 @@ class PushService {
 
 }
 
-class LastNotificationService(kVStorage: KeyValueStorage) {
-  private val lastIdPref = kVStorage.keyValuePref[Option[Uid]]("last_notification_id", None)
+class LastNotificationIdService(kVStorage: KeyValueStorage) {
+  import LastNotificationIdService._
+  private val lastIdPref = kVStorage.keyValuePref[Option[Uid]](LastNotficationId, None)
 
   def lastNotificationId() = Future(lastIdPref()).flatten
 
@@ -27,3 +28,6 @@ class LastNotificationService(kVStorage: KeyValueStorage) {
 
 }
 
+object LastNotificationIdService {
+  val LastNotficationId = "last_notification_id"
+}

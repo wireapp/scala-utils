@@ -21,7 +21,7 @@ import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.{ConcurrentLinkedQueue, CountDownLatch, CyclicBarrier}
 
 import com.wire.testutils.{RichLatch, TestInt}
-import com.wire.testutils.TestSpec
+import com.wire.testutils.FullFeatureSpec
 import com.wire.threading.{SerialDispatchQueue, Threading}
 import org.scalatest.{BeforeAndAfter, FeatureSpec, Matchers, OptionValues}
 
@@ -29,7 +29,7 @@ import scala.collection.JavaConverters._
 import scala.concurrent.duration._
 import scala.concurrent.{Await, ExecutionContext, Future, blocking}
 
-class SignalSpec extends TestSpec {
+class SignalSpec extends FullFeatureSpec {
   import scala.concurrent.ExecutionContext.Implicits.global
 
   implicit val ec: EventContext = EventContext.Global

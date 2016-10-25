@@ -2,7 +2,7 @@ package com.wire.playground
 
 import java.util.concurrent.CountDownLatch
 
-import com.wire.testutils.{RichLatch, TestSpec}
+import com.wire.testutils.{RichLatch, FullFeatureSpec}
 import com.wire.threading.Threading
 import org.scalatest.Ignore
 import org.threeten.bp.Instant
@@ -11,7 +11,7 @@ import scala.concurrent.{Await, Future}
 import scala.concurrent.duration._
 
 @Ignore
-class FutureSpec extends TestSpec {
+class FutureSpec extends FullFeatureSpec {
 
   feature("Testing futures") {
 
