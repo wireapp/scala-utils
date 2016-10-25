@@ -37,27 +37,25 @@ package object testutils {
   implicit lazy val printVals: Print = false
   implicit lazy val duration = 3.seconds
 
-  object Implicits {
-
-    implicit class TestInt(val a: Int) extends AnyVal {
-      def times(f: => Unit): Unit = {
-        require(a >= 1, "number of times should be at least 1")
-        (1 to a) foreach (_ => f)
-      }
+  implicit class TestInt(val a: Int) extends AnyVal {
+    def times(f: => Unit): Unit = {
+      require(a >= 1, "number of times should be at least 1")
+      (1 to a) foreach (_ => f)
     }
+  }
 
-    implicit class RichLatch(val l: CountDownLatch) extends AnyVal {
-      def awaitDefault() = l.await(duration.toMillis, TimeUnit.MILLISECONDS)
-    }
+  implicit class RichLatch(val l: CountDownLatch) extends AnyVal {
+    def awaitDefault() = l.await(duration.toMillis, TimeUnit.MILLISECONDS)
+    def awaitDuration(d: Duration) = l.await(d.toMillis, TimeUnit.MILLISECONDS)
+  }
 
-    implicit class RichAtomicReference[V](val ref: AtomicReference[V]) extends AnyVal {
-      @tailrec
-      final def update(updater: V => V): V = {
-        val current = ref.get
-        val updated = updater(current)
-        if (ref.compareAndSet(current, updated)) updated
-        else ref.update(updater)
-      }
+  implicit class RichAtomicReference[V](val ref: AtomicReference[V]) extends AnyVal {
+    @tailrec
+    final def update(updater: V => V): V = {
+      val current = ref.get
+      val updated = updater(current)
+      if (ref.compareAndSet(current, updated)) updated
+      else ref.update(updater)
     }
   }
 

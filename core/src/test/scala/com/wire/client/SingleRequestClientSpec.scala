@@ -5,7 +5,7 @@ import java.util.concurrent.CountDownLatch
 import com.wire.client.ClientEngine.{ErrorOr, ErrorResponse, Request, Response}
 import com.wire.client.SingleRequestClient.NotId
 import com.wire.events.EventContext
-import com.wire.testutils.Implicits.RichLatch
+import com.wire.testutils.RichLatch
 import com.wire.testutils.Matchers.FutureSyntax
 import com.wire.testutils.TestSpec
 import com.wire.threading.Threading

@@ -20,7 +20,7 @@ package com.wire.events
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.{ConcurrentLinkedQueue, CountDownLatch, CyclicBarrier}
 
-import com.wire.testutils.Implicits.{RichLatch, TestInt}
+import com.wire.testutils.{RichLatch, TestInt}
 import com.wire.testutils.TestSpec
 import com.wire.threading.{SerialDispatchQueue, Threading}
 import org.scalatest.{BeforeAndAfter, FeatureSpec, Matchers, OptionValues}

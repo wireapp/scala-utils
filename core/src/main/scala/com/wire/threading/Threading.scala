@@ -16,15 +16,15 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
- package com.wire.threading
+package com.wire.threading
 
 import java.util.Timer
 import java.util.concurrent.{Executor, ExecutorService, Executors}
 
-import com.wire.macros.logging.ImplicitTag._
 import com.wire.logging.Logging.{error, warn}
+import com.wire.macros.logging.ImplicitTag._
 
-import scala.concurrent.{ExecutionContext, Future, Promise, blocking}
+import scala.concurrent.{ExecutionContext, blocking}
 
 object Threading {
 
@@ -48,8 +48,8 @@ object Threading {
   private var _Ui: Option[UiDispatchQueue] = None //to be set by specific environment
 
   def setUiDispatchQueue(uiDispatchQueue: UiDispatchQueue) = {
-    if (_Ui.isDefined) warn("Ui thread has already been set by application")
-    _Ui = Some(uiDispatchQueue)
+    if (_Ui.isDefined) warn("Ui thread has already been set by application - will not change")
+    else _Ui = Some(uiDispatchQueue)
   }
 
   lazy val Ui = _Ui.getOrElse(throw new IllegalStateException("Application needs to set a UI Dispatch Queue"))
@@ -88,16 +88,16 @@ object Threading {
     */
   val ImageDispatcher = new LimitedDispatchQueue(Cpus - 1, ThreadPool, "ImageDispatcher")
 
-//  lazy val BackgroundHandler: Future[Handler] = {
-//    val looper = Promise[Looper]
-//    val looperThread = new HandlerThread("BackgroundHandlerThread") {
-//      override def onLooperPrepared(): Unit = looper.success(getLooper)
-//    }
-//    looperThread.start()
-//    looper.future.map(new Handler(_))(Background)
-//  }
+  //  lazy val BackgroundHandler: Future[Handler] = {
+  //    val looper = Promise[Looper]
+  //    val looperThread = new HandlerThread("BackgroundHandlerThread") {
+  //      override def onLooperPrepared(): Unit = looper.success(getLooper)
+  //    }
+  //    looperThread.start()
+  //    looper.future.map(new Handler(_))(Background)
+  //  }
 
-//  def assertUiThread(): Unit = if (AssertsEnabled && (Thread.currentThread ne Looper.getMainLooper.getThread)) throw new AssertionError(s"Should be run on Ui thread, but is using: ${Thread.currentThread().getName}")
+  //  def assertUiThread(): Unit = if (AssertsEnabled && (Thread.currentThread ne Looper.getMainLooper.getThread)) throw new AssertionError(s"Should be run on Ui thread, but is using: ${Thread.currentThread().getName}")
 
-//  def assertNotUiThread(): Unit = if (AssertsEnabled && (Thread.currentThread eq Looper.getMainLooper.getThread)) throw new AssertionError(s"Should be run on background thread, but is using: ${Thread.currentThread().getName}")
+  //  def assertNotUiThread(): Unit = if (AssertsEnabled && (Thread.currentThread eq Looper.getMainLooper.getThread)) throw new AssertionError(s"Should be run on background thread, but is using: ${Thread.currentThread().getName}")
 }

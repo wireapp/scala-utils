@@ -19,7 +19,7 @@ package com.wire.events
 
 import java.util.concurrent.atomic.AtomicReference
 
-import com.wire.testutils.Implicits.{RichAtomicReference, TestInt}
+import com.wire.testutils.{RichAtomicReference, TestInt}
 import com.wire.testutils.Uncontended.random
 import com.wire.testutils.{IntSignal, TestSpec}
 import com.wire.threading.CancellableFuture.delayed
