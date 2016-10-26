@@ -18,6 +18,7 @@
  */
  package com.wire
 
+import java.security.MessageDigest
 import java.util.Date
 import java.util.concurrent.TimeoutException
 import java.util.concurrent.atomic.AtomicReference
@@ -25,6 +26,7 @@ import java.util.concurrent.atomic.AtomicReference
 import com.wire.error.LoggedTry
 import com.wire.macros.logging.LogTag
 import com.wire.threading.{CancellableFuture, Threading}
+import org.apache.commons.codec.binary.Base64
 import org.threeten.bp
 import org.threeten.bp.Instant
 import org.threeten.bp.Instant.now
@@ -57,7 +59,9 @@ package object utils {
     }
   }
 
-  //TODO add back Base64 and sha methods
+  def sha2(s: String): String = Base64.encodeBase64String(MessageDigest.getInstance("SHA-256").digest(s.getBytes("utf8")))
+
+  def sha2(bytes: Array[Byte]): String = Base64.encodeBase64String(MessageDigest.getInstance("SHA-256").digest(bytes))
 
   trait SHA2Digest {
     def apply(s: String): String

@@ -25,6 +25,7 @@ lazy val core = (project in file("core"))
       "ch.qos.logback" % "logback-classic" % "1.1.7",
       "com.typesafe.scala-logging" %% "scala-logging" % "3.4.0",
       "org.json" % "json" % "20160810",
+      "commons-codec" % "commons-codec" % "1.10",
       "org.threeten" % "threetenbp" % "1.3" % Provided,
 
       //test dependencies
