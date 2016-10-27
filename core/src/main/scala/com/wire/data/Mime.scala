@@ -1,4 +1,4 @@
-package com.wire.core
+package com.wire.data
 
 import scala.PartialFunction._
 

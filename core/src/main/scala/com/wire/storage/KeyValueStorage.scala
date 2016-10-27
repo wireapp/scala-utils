@@ -9,9 +9,9 @@ trait KeyValueStorage {
   def getPref(key: String): Future[Option[String]]
   def setPref(key: String, value: String): Future[KeyValueData]
   def delPref(key: String): Future[Unit]
-  def decodePref[A](key: String, dec: String => A): Future[Option[A]] = getPref(key).map(_.map(dec))
+  def decodePref[A](key: String, dec: String => A): Future[Option[A]]
 
-  def keyValuePref[A: PrefCodec](key: String, default: A) = new KeyValuePref[A](this, key, default)
+  def keyValuePref[A: PrefCodec](key: String, default: A)(implicit executionContext: ExecutionContext) = new KeyValuePref[A](this, key, default)
 }
 
 object KeyValueStorage {

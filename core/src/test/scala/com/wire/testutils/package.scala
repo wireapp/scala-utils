@@ -17,16 +17,19 @@
  */
 package com.wire
 
+import java.io.InputStream
 import java.util.Random
 import java.util.concurrent.atomic.AtomicReference
 import java.util.concurrent.{CountDownLatch, TimeUnit}
 
 import com.wire.events.{Signal, SourceSignal}
 import com.wire.threading.Threading
+import org.json.JSONObject
 
 import scala.annotation.tailrec
 import scala.concurrent.Await
 import scala.concurrent.duration.{Duration, DurationLong}
+import scala.io.Source
 import scala.language.implicitConversions
 
 package object testutils {
@@ -83,4 +86,7 @@ package object testutils {
     override protected def onWire(): Unit = isWired = true
     override protected def onUnwire(): Unit = isWired = false
   }
+
+  def jsonFrom(fileName: String) = new JSONObject(Source.fromInputStream(resourceStream(fileName)).getLines().mkString("\n"))
+  def resourceStream(name: String): InputStream = getClass.getResourceAsStream(name)
 }

@@ -2,7 +2,7 @@ package com.wire.cache
 
 import java.io._
 
-import com.wire.core.{Mime, Uid}
+import com.wire.data.{Mime, Uid}
 import com.wire.cryptography.AESKey
 import com.wire.threading.{CancellableFuture, Threading}
 
@@ -11,7 +11,7 @@ import scala.concurrent.duration._
 
 trait CacheService {
   // create new cache entry for file, return the entry immediately
-  def createManagedFile(key: Option[AESKey] = None)(implicit timeout: Expiration = CacheService.DefaultExpiryTime)
+  def createManagedFile(key: Option[AESKey] = None)(implicit timeout: Expiration = CacheService.DefaultExpiryTime): CacheEntry
 
   def createForFile(key: String = Uid().str,  mime: Mime = Mime.Unknown, name: Option[String] = None, cacheLocation: Option[File] = None, length: Option[Long] = None)(implicit timeout: Expiration = CacheService.DefaultExpiryTime)
 

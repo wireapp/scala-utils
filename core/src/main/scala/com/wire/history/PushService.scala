@@ -1,19 +1,24 @@
 package com.wire.history
 
-import com.wire.core.Uid
-import com.wire.logging.Logging
+import com.wire.data.Uid
 import com.wire.logging.Logging.verbose
+import com.wire.macros.logging.ImplicitTag._
 import com.wire.storage.KeyValueStorage
+import com.wire.threading.Threading
+import com.wire.utils.RichFuture
 
 import scala.concurrent.Future
-import com.wire.utils.RichFuture
 
 class PushService {
 
 }
 
 class LastNotificationIdService(kVStorage: KeyValueStorage) {
+
   import LastNotificationIdService._
+
+  implicit val dispatcher = Threading.Background
+
   private val lastIdPref = kVStorage.keyValuePref[Option[Uid]](LastNotficationId, None)
 
   def lastNotificationId() = Future(lastIdPref()).flatten

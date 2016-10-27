@@ -1,6 +1,6 @@
 package com.wire.history
 
-import com.wire.core.Uid
+import com.wire.data.Uid
 import com.wire.storage.KeyValueStorage
 import com.wire.testutils.{FullFeatureSpec, FullFlatSpec}
 

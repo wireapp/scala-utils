@@ -1,5 +1,6 @@
 package com.wire.storage
 
+import com.wire.data.{Id, IdGen}
 import com.wire.events.{Signal, SourceSignal}
 import com.wire.threading.{SerialDispatchQueue, Threading}
 import org.threeten.bp.Instant
@@ -73,7 +74,7 @@ object Preference {
     implicit val LongCodec = apply[Long](String.valueOf, java.lang.Long.parseLong)
     implicit val BooleanCodec = apply[Boolean](String.valueOf, java.lang.Boolean.parseBoolean)
 
-    //    implicit def idCodec[A: Id]: PrefCodec[A] = apply[A](implicitly[Id[A]].encode, implicitly[Id[A]].decode)
+    implicit def idCodec[A <: Id: IdGen]: PrefCodec[A] = apply[A](implicitly[IdGen[A]].encode, implicitly[IdGen[A]].decode)
     implicit def optCodec[A: PrefCodec]: PrefCodec[Option[A]] = apply[Option[A]](_.fold("")(implicitly[PrefCodec[A]].encode), { str => if (str == "") None else Some(implicitly[PrefCodec[A]].decode(str)) })
 
     implicit val InstantCodec = apply[Instant](d => String.valueOf(d.toEpochMilli), s => Instant.ofEpochMilli(java.lang.Long.parseLong(s)))
