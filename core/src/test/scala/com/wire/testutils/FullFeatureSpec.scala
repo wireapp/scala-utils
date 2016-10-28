@@ -19,14 +19,3 @@ abstract class FullFeatureSpec extends FeatureSpec with scalatest.Matchers with 
   }
 
 }
-
-abstract class FullFlatSpec extends FlatSpec with scalatest.Matchers with OptionValues with BeforeAndAfter with BeforeAndAfterAll with OneInstancePerTest with MockFactory {
-
-  override def beforeAll {
-    Threading.setUiDispatchQueue(new UiDispatchQueue {
-      override def execute(runnable: Runnable): Unit = runnable.run()
-    })
-
-  }
-
-}

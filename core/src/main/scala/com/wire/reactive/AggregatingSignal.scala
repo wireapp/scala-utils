@@ -16,7 +16,7 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
- package com.wire.events
+ package com.wire.reactive
 
 import java.util.concurrent.atomic.AtomicReference
 
@@ -34,7 +34,7 @@ class AggregatingSignal[A, B](source: EventStream[A], load: => Future[B], f: (B,
   private val loadId = new AtomicReference[AnyRef]
   @volatile private var stash = Vector.empty[A]
 
-  override protected[events] def onEvent(event: A, currentContext: Option[ExecutionContext]): Unit = valueMonitor synchronized {
+  override protected[reactive] def onEvent(event: A, currentContext: Option[ExecutionContext]): Unit = valueMonitor synchronized {
     if (loadId.get eq null) value.foreach(v => AggregatingSignal.this.set(Some(f(v, event)), currentContext))
     else if (stashing) stash :+= event
   }

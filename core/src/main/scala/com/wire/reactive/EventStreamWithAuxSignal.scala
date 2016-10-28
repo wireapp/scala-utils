@@ -16,13 +16,13 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
- package com.wire.events
+ package com.wire.reactive
 
 import scala.concurrent.ExecutionContext
 
 class EventStreamWithAuxSignal[A, B](source: EventStream[A], aux: Signal[B]) extends EventStream[(A, Option[B])] {
   val listener = new EventListener[A] {
-    override protected[events] def onEvent(event: A, sourceContext: Option[ExecutionContext]): Unit = dispatch((event, aux.currentValue), sourceContext)
+    override protected[reactive] def onEvent(event: A, sourceContext: Option[ExecutionContext]): Unit = dispatch((event, aux.currentValue), sourceContext)
   }
 
   val auxListener = new SignalListener { override def changed(currentContext: Option[ExecutionContext]): Unit = () }

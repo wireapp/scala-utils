@@ -16,11 +16,11 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
- package com.wire.events
+ package com.wire.reactive
 
 import java.util.concurrent.atomic.AtomicBoolean
 
-import com.wire.events.Events.Subscriber
+import com.wire.reactive.Events.Subscriber
 import com.wire.logging.Logging.warn
 import com.wire.macros.logging.ImplicitTag._
 import com.wire.macros.logging.LogTag
@@ -90,11 +90,11 @@ trait SignalListener {
   def changed(currentContext: Option[ExecutionContext]): Unit
 }
 
-class Signal[A](@volatile protected[events] var value: Option[A] = None) extends Observable[SignalListener] with EventSource[A] { self =>
+class Signal[A](@volatile protected[reactive] var value: Option[A] = None) extends Observable[SignalListener] with EventSource[A] { self =>
 
   private object updateMonitor
 
-  protected[events] def update(f: Option[A] => Option[A], currentContext: Option[ExecutionContext] = None): Boolean = {
+  protected[reactive] def update(f: Option[A] => Option[A], currentContext: Option[ExecutionContext] = None): Boolean = {
     val changed = updateMonitor.synchronized {
       val next = f(value)
       if (value != next) { value = next; true }
@@ -104,14 +104,14 @@ class Signal[A](@volatile protected[events] var value: Option[A] = None) extends
     changed
   }
 
-  protected[events] def set(v: Option[A], currentContext: Option[ExecutionContext] = None) = {
+  protected[reactive] def set(v: Option[A], currentContext: Option[ExecutionContext] = None) = {
     if (value != v) {
       value = v
       notifyListeners(currentContext)
     }
   }
 
-  private[events] def notifyListeners(currentContext: Option[ExecutionContext]): Unit = super.notifyListeners { _.changed(currentContext) }
+  private[reactive] def notifyListeners(currentContext: Option[ExecutionContext]): Unit = super.notifyListeners { _.changed(currentContext) }
 
   final def currentValue: Option[A] = {
     if (!wired) {
@@ -196,8 +196,8 @@ class Signal[A](@volatile protected[events] var value: Option[A] = None) extends
 class ConstSignal[A](v: Option[A]) extends Signal[A](v) {
   override def subscribe(l: SignalListener): Unit = ()
   override def unsubscribe(l: SignalListener): Unit = ()
-  override protected[events] def update(f: (Option[A]) => Option[A], ec: Option[ExecutionContext]): Boolean = throw new UnsupportedOperationException("Const signal can not be updated")
-  override protected[events] def set(v: Option[A], ec: Option[ExecutionContext]): Unit = throw new UnsupportedOperationException("Const signal can not be changed")
+  override protected[reactive] def update(f: (Option[A]) => Option[A], ec: Option[ExecutionContext]): Boolean = throw new UnsupportedOperationException("Const signal can not be updated")
+  override protected[reactive] def set(v: Option[A], ec: Option[ExecutionContext]): Unit = throw new UnsupportedOperationException("Const signal can not be changed")
 }
 
 class ThrottlingSignal[A](source: Signal[A], delay: FiniteDuration) extends ProxySignal[A](source) {
@@ -207,7 +207,7 @@ class ThrottlingSignal[A](source: Signal[A], delay: FiniteDuration) extends Prox
 
   override protected def computeValue(current: Option[A]): Option[A] = source.value
 
-  override private[events] def notifyListeners(ec: Option[ExecutionContext]): Unit =
+  override private[reactive] def notifyListeners(ec: Option[ExecutionContext]): Unit =
     if (waiting.compareAndSet(false, true)) {
       val context = ec.getOrElse(Threading.Background)
       val d = math.max(0, lastDispatched - System.currentTimeMillis() + delay.toMillis)

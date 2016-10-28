@@ -22,7 +22,7 @@ import java.util.Random
 import java.util.concurrent.atomic.AtomicReference
 import java.util.concurrent.{CountDownLatch, TimeUnit}
 
-import com.wire.events.{Signal, SourceSignal}
+import com.wire.reactive.{Signal, SourceSignal}
 import com.wire.threading.Threading
 import org.json.JSONObject
 

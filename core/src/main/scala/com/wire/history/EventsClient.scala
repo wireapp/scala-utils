@@ -1,7 +1,7 @@
 package com.wire.history
 
-import com.wire.data.{ClientId, Event, JsonDecoder, Uid}
-import com.wire.events.EventStream
+import com.wire.data.{ClientId, Event, JsonDecoder, UId}
+import com.wire.reactive.EventStream
 import com.wire.logging.Logging.warn
 import com.wire.macros.logging.ImplicitTag._
 import com.wire.network._
@@ -27,11 +27,11 @@ class EventsClient(engine: ClientEngine) {
     * another request with the since id being the latest Id anyway, so we'll get back an empty list from BE. We could
     * alternatively check the timestamps to avoid this unnecessary request, but it's really not a big deal.
     */
-  private var currentRequest = CancellableFuture.successful(Option.empty[Uid], false)
+  private var currentRequest = CancellableFuture.successful(Option.empty[UId], false)
 
-  def loadNotifications(since: Option[Uid], clientId: ClientId, pageSize: Int = 1000): CancellableFuture[Option[Uid]] = {
+  def loadNotifications(since: Option[UId], clientId: ClientId, pageSize: Int = 1000): CancellableFuture[Option[UId]] = {
 
-    def loadNextPage(lastStableId: Option[Uid]): CancellableFuture[(Option[Uid], Boolean)] =
+    def loadNextPage(lastStableId: Option[UId]): CancellableFuture[(Option[UId], Boolean)] =
       engine.fetch(RequestTag, Request.Get(notificationsPath(lastStableId, clientId, pageSize))) flatMap { r =>
         println(s"response: $r")
         r match {
@@ -50,7 +50,7 @@ class EventsClient(engine: ClientEngine) {
   }
 }
 
-case class PushNotification(id: Uid, events: Seq[Event], transient: Boolean = false)
+case class PushNotification(id: UId, events: Seq[Event], transient: Boolean = false)
 
 object PushNotification {
   implicit lazy val NotificationDecoder: JsonDecoder[PushNotification] = new JsonDecoder[PushNotification] {
@@ -63,7 +63,7 @@ object PushNotification {
 
 object EventsClient {
 
-  def notificationsPath(since: Option[Uid], client: ClientId, pageSize: Int) = {
+  def notificationsPath(since: Option[UId], client: ClientId, pageSize: Int) = {
     val args = Seq("since" -> since, "client" -> Some(client), "size" -> Some(pageSize)) collect { case (key, Some(v)) => key -> v }
     Request.query(NotificationsPath, args: _*)
   }

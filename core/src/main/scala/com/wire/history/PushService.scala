@@ -1,6 +1,6 @@
 package com.wire.history
 
-import com.wire.data.Uid
+import com.wire.data.UId
 import com.wire.logging.Logging.verbose
 import com.wire.macros.logging.ImplicitTag._
 import com.wire.storage.KeyValueStorage
@@ -19,11 +19,11 @@ class LastNotificationIdService(kVStorage: KeyValueStorage) {
 
   implicit val dispatcher = Threading.Background
 
-  private val lastIdPref = kVStorage.keyValuePref[Option[Uid]](LastNotficationId, None)
+  private val lastIdPref = kVStorage.keyValuePref[Option[UId]](LastNotficationId, None)
 
   def lastNotificationId() = Future(lastIdPref()).flatten
 
-  def updateLastIdOnNotification(id: Uid, processing: Future[Any]): Unit = {
+  def updateLastIdOnNotification(id: UId, processing: Future[Any]): Unit = {
     processing.onSuccess {
       case _ =>
         lastIdPref := Some(id)

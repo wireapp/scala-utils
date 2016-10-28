@@ -1,7 +1,7 @@
 package com.wire.storage
 
 import com.wire.data.{Id, IdGen}
-import com.wire.events.{Signal, SourceSignal}
+import com.wire.reactive.{Signal, SourceSignal}
 import com.wire.threading.{SerialDispatchQueue, Threading}
 import org.threeten.bp.Instant
 

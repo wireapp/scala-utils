@@ -16,11 +16,11 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
- package com.wire.events
+ package com.wire.reactive
 
 import java.util.UUID.randomUUID
 
-import com.wire.events.Events.Subscriber
+import com.wire.reactive.Events.Subscriber
 import com.wire.logging.Logging.error
 import com.wire.macros.logging.{LogTag, logTagFor}
 import com.wire.macros.logging.ImplicitTag._
@@ -31,9 +31,9 @@ import scala.concurrent.{ExecutionContext, Future, Promise}
 import scala.ref.WeakReference
 import scala.util.{Failure, Success}
 
-private[events] trait EventListener[E] {
+private[reactive] trait EventListener[E] {
   // 'currentContext' is the context this method IS run in, NOT the context any subsequent methods SHOULD run in
-  protected[events] def onEvent(event: E, currentContext: Option[ExecutionContext]): Unit
+  protected[reactive] def onEvent(event: E, currentContext: Option[ExecutionContext]): Unit
 }
 
 object EventStream {
@@ -64,7 +64,7 @@ class EventStream[E] extends EventSource[E] with Observable[EventListener[E]] {
     notifyListeners(_.onEvent(event, currentExecutionContext))
   }
 
-  protected[events] def dispatch(event: E, sourceContext: Option[ExecutionContext]): Unit = executionContext match {
+  protected[reactive] def dispatch(event: E, sourceContext: Option[ExecutionContext]): Unit = executionContext match {
     case None | `sourceContext` => dispatchEvent(event, sourceContext)
     case Some(ctx) => Future(dispatchEvent(event, executionContext))(ctx)
   }
@@ -101,13 +101,13 @@ abstract class ProxyEventStream[A, E](sources: EventStream[A]*) extends EventStr
 }
 
 class MapEventStream[E, V](source: EventStream[E], f: E => V) extends ProxyEventStream[E, V](source) {
-  override protected[events] def onEvent(event: E, sourceContext: Option[ExecutionContext]): Unit = dispatch(f(event), sourceContext)
+  override protected[reactive] def onEvent(event: E, sourceContext: Option[ExecutionContext]): Unit = dispatch(f(event), sourceContext)
 }
 
 class FutureEventStream[E, V](source: EventStream[E], f: E => Future[V]) extends ProxyEventStream[E, V](source) {
   private val key = randomUUID()
 
-  override protected[events] def onEvent(event: E, sourceContext: Option[ExecutionContext]): Unit =
+  override protected[reactive] def onEvent(event: E, sourceContext: Option[ExecutionContext]): Unit =
     Serialized.future(key)(f(event).andThen {
       case Success(v) => dispatch(v, sourceContext)
       case Failure(t: NoSuchElementException) => // do nothing to allow Future.filter/collect
@@ -119,22 +119,22 @@ object FutureEventStream {
 }
 
 class CollectEventStream[E, V](source: EventStream[E], pf: PartialFunction[E, V]) extends ProxyEventStream[E, V](source) {
-  override protected[events] def onEvent(event: E, sourceContext: Option[ExecutionContext]): Unit =
+  override protected[reactive] def onEvent(event: E, sourceContext: Option[ExecutionContext]): Unit =
     if (pf.isDefinedAt(event)) dispatch(pf(event), sourceContext)
 }
 
 class FilterEventStream[E](source: EventStream[E], f: E => Boolean) extends ProxyEventStream[E, E](source) {
-  override protected[events] def onEvent(event: E, sourceContext: Option[ExecutionContext]): Unit = if (f(event)) dispatch(event, sourceContext)
+  override protected[reactive] def onEvent(event: E, sourceContext: Option[ExecutionContext]): Unit = if (f(event)) dispatch(event, sourceContext)
 }
 
 class UnionEventStream[E](sources: EventStream[E]*) extends ProxyEventStream[E, E](sources: _*) {
-  override protected[events] def onEvent(event: E, sourceContext: Option[ExecutionContext]): Unit = dispatch(event, sourceContext)
+  override protected[reactive] def onEvent(event: E, sourceContext: Option[ExecutionContext]): Unit = dispatch(event, sourceContext)
 }
 
 class ScanEventStream[E, V](source: EventStream[E], zero: V, f: (V, E) => V) extends ProxyEventStream[E, V] {
   @volatile private var value = zero
 
-  override protected[events] def onEvent(event: E, sourceContext: Option[ExecutionContext]): Unit = {
+  override protected[reactive] def onEvent(event: E, sourceContext: Option[ExecutionContext]): Unit = {
     value = f(value, event)
     dispatch(value, sourceContext)
   }

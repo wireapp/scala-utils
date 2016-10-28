@@ -2,7 +2,7 @@ package com.wire.download
 
 import com.wire.cache.{CacheEntry, Expiration}
 import com.wire.download.ProgressIndicator.ProgressData
-import com.wire.events.Signal
+import com.wire.reactive.Signal
 import com.wire.threading.CancellableFuture
 
 import scala.concurrent.Future

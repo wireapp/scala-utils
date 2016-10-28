@@ -16,7 +16,7 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
- package com.wire.events
+ package com.wire.reactive
 
 import com.wire.error.LoggedTry
 import com.wire.macros.returning
@@ -60,14 +60,14 @@ trait ForcedEventSource[E] extends EventSource[E] {
 }
 
 abstract class BaseSubscription(context: WeakReference[EventContext]) extends Subscription {
-  @volatile protected[events] var subscribed = false
+  @volatile protected[reactive] var subscribed = false
   private var enabled = false
   private var pauseWithContext = true
 
   context.get foreach (_.register(this))
 
-  protected[events] def onSubscribe(): Unit
-  protected[events] def onUnsubscribe(): Unit
+  protected[reactive] def onSubscribe(): Unit
+  protected[reactive] def onUnsubscribe(): Unit
 
   def subscribe(): Unit =
     if (enabled && !subscribed) {
@@ -115,12 +115,12 @@ class SignalSubscription[E](source: Signal[E], subscriber: Events.Subscriber[E],
     }
   }
 
-  override protected[events] def onSubscribe(): Unit = {
+  override protected[reactive] def onSubscribe(): Unit = {
     source.subscribe(this)
     changed(None) // refresh listener with current value
   }
 
-  override protected[events] def onUnsubscribe(): Unit = source.unsubscribe(this)
+  override protected[reactive] def onUnsubscribe(): Unit = source.unsubscribe(this)
 }
 
 class StreamSubscription[E](source: EventStream[E], subscriber: Events.Subscriber[E], executionContext: Option[ExecutionContext] = None)(implicit context: WeakReference[EventContext]) extends BaseSubscription(context) with EventListener[E] {
@@ -133,9 +133,9 @@ class StreamSubscription[E](source: EventStream[E], subscriber: Events.Subscribe
     }
   }
 
-  override protected[events] def onSubscribe(): Unit = source.subscribe(this)
+  override protected[reactive] def onSubscribe(): Unit = source.subscribe(this)
 
-  override protected[events] def onUnsubscribe(): Unit = source.unsubscribe(this)
+  override protected[reactive] def onUnsubscribe(): Unit = source.unsubscribe(this)
 }
 
 trait BgEventSource { self: EventSource[_] =>

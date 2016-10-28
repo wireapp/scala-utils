@@ -2,8 +2,8 @@ package com.wire.history
 
 import java.util.concurrent.CountDownLatch
 
-import com.wire.data.{ClientId, Uid}
-import com.wire.events.EventContext
+import com.wire.data.{ClientId, UId}
+import com.wire.reactive.EventContext
 import com.wire.network.Response.HttpStatus
 import com.wire.network.{ClientEngine, JsonObjectResponse, Request, Response}
 import com.wire.testutils.Matchers.FutureSyntax
@@ -40,8 +40,8 @@ class EventsClientSpec extends FullFeatureSpec {
       val jsonResponse = JsonObjectResponse(jsonFrom("/notifications.json"))
       println(jsonResponse)
 
-      val since = Some(Uid(lastNot - pageSize))
-      val last = Some(Uid(lastNot))
+      val since = Some(UId(lastNot - pageSize))
+      val last = Some(UId(lastNot))
 
       val mockClientEngine = mock[ClientEngine]
 
@@ -58,7 +58,7 @@ class EventsClientSpec extends FullFeatureSpec {
         ns should have size pageSize
         latch.countDown()
       }
-      loadNotifications(client, Some(Uid(lastNot - pageSize))).await() shouldEqual Some(Uid(lastNot))
+      loadNotifications(client, Some(UId(lastNot - pageSize))).await() shouldEqual Some(UId(lastNot))
       latch.awaitDefault() shouldEqual true
     }
 
@@ -68,7 +68,7 @@ class EventsClientSpec extends FullFeatureSpec {
         pagesTest = { (ns, _) =>
           ns.size shouldEqual historyToFetch
         },
-        body = loadNotifications(_, Some(Uid(lastNot - historyToFetch))).await() shouldEqual Some(Uid(lastNot))
+        body = loadNotifications(_, Some(UId(lastNot - historyToFetch))).await() shouldEqual Some(UId(lastNot))
       )
     }
 
@@ -77,7 +77,7 @@ class EventsClientSpec extends FullFeatureSpec {
         pagesTest = { (ns, _) =>
           ns should have size pageSize
         },
-        body = loadNotifications(_, Some(Uid(lastNot - pageSize * 2))).await() shouldEqual Some(Uid(lastNot))
+        body = loadNotifications(_, Some(UId(lastNot - pageSize * 2))).await() shouldEqual Some(UId(lastNot))
       )
     }
 
@@ -87,7 +87,7 @@ class EventsClientSpec extends FullFeatureSpec {
         pagesTest = { (ns, pageNumber) =>
           ns.size shouldEqual (if (pageNumber == 1) pageSize else historyToFetch - pageSize)
         },
-        body = loadNotifications(_, Some(Uid(lastNot - historyToFetch))).await() shouldEqual Some(Uid(lastNot))
+        body = loadNotifications(_, Some(UId(lastNot - historyToFetch))).await() shouldEqual Some(UId(lastNot))
       )
     }
 
@@ -96,7 +96,7 @@ class EventsClientSpec extends FullFeatureSpec {
         pagesTest = { (ns, _) =>
           ns should have size pageSize
         },
-        body = loadNotifications(_, None).await() shouldEqual Some(Uid(lastNot))
+        body = loadNotifications(_, None).await() shouldEqual Some(UId(lastNot))
       )
     }
   }
@@ -111,18 +111,18 @@ class EventsClientSpec extends FullFeatureSpec {
           ns.size shouldEqual 2
         },
         body = { client =>
-          loadNotifications(client, Some(Uid(lastNot - 1)))
+          loadNotifications(client, Some(UId(lastNot - 1)))
 
           //BE receives a new message sent to our client
           //          testEngine.newHistory(1)
 
           //while request is processing, we receive some delayed trigger
-          loadNotifications(client, Some(Uid(lastNot - 1))).await() shouldEqual Some(Uid(lastNot + 1))
+          loadNotifications(client, Some(UId(lastNot - 1))).await() shouldEqual Some(UId(lastNot + 1))
         })
     }
   }
 
-  def loadNotifications(eventsClient: EventsClient, since: Option[Uid])(implicit clientId: ClientId) =
+  def loadNotifications(eventsClient: EventsClient, since: Option[UId])(implicit clientId: ClientId) =
     eventsClient.loadNotifications(since, clientId)
 
 

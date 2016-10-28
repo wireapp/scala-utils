@@ -1,18 +1,15 @@
 package com.wire.history
 
-import com.wire.data.Uid
 import com.wire.storage.KeyValueStorage
-import com.wire.testutils.{FullFeatureSpec, FullFlatSpec}
+import com.wire.testutils.FullFeatureSpec
 
-class LastNotificationIdServiceTest extends FullFlatSpec {
+class LastNotificationIdServiceTest extends FullFeatureSpec {
 
   val mockKVStorage = mock[KeyValueStorage]
 
-  behavior of "The LastNotificationIdService"
+  scenario("Update the last id when all notifications have finished process") {
 
-  it should "update the last id when all notifications have finished process" in {
-
-//    (mockKVStorage.keyValuePref _ ).expects(LastNotificationIdService.LastNotficationId).
+    //    (mockKVStorage.keyValuePref _ ).expects(LastNotificationIdService.LastNotficationId).
     val service = new LastNotificationIdService(mockKVStorage)
 
   }
