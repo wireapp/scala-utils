@@ -1,6 +1,6 @@
 package com.wire.data
 
-import com.wire.data.ProtoBuffer.GenericMessage
+import com.wire.data.ProtoFactory.GenericMessage
 import com.wire.macros.logging
 import com.wire.macros.logging.LogTag
 import org.json.JSONObject

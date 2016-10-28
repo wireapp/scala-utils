@@ -1,13 +1,13 @@
 package com.wire.messages
 
 
-import com.wire.data.ProtoBuffer.GenericMessage
+import com.wire.data.ProtoFactory.GenericMessage
 import com.wire.data.{ConvId, MessageId, UserId}
 import org.threeten.bp.Instant
 
 case class MessageData(id:        MessageId           = MessageId(),
                        convId:    ConvId              = ConvId(),
-                       userId:    UserId              = UserId(),
+                       senderId:    UserId              = UserId(),
                        msgType:   MessageType         = MessageType.Text,
                        protos:    Seq[GenericMessage] = Seq.empty,
                        localTime: Instant             = Instant.now
@@ -17,8 +17,9 @@ case class MessageData(id:        MessageId           = MessageId(),
       |MessageData:
       | id:         $id
       | convId:     $convId
-      | userId:     $userId
+      | senderId:   $senderId
       | msgType:    $msgType
+      | protos:     ${protos.toString().replace("\n", "")}
       | localTime:  $localTime
     """.stripMargin
 }

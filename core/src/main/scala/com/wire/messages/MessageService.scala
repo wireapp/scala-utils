@@ -1,7 +1,8 @@
 package com.wire.messages
 
 import com.wire.conversations.ConversationData
-import com.wire.data.{AssetId, ConvId, MessageEvent, Mime}
+import com.wire.data.ProtoFactory.{GenericMessage, Text}
+import com.wire.data._
 
 import scala.concurrent.Future
 
@@ -15,9 +16,19 @@ class DefaultMessageService extends MessageService {
 
   import com.wire.threading.Threading.Implicits.Background
 
-  override private[messages] def processEvents(conv: ConversationData, events: Seq[MessageEvent]): Future[Seq[MessageData]] = {
-    Future(Seq(MessageData()))
-  }
+  override private[messages] def processEvents(conv: ConversationData, events: Seq[MessageEvent]): Future[Seq[MessageData]] =
+    Future {
+      events.collect {
+        case GenericMessageEvent(id, convId, time, from, protos@GenericMessage(_, Text(content))) =>
+          MessageData(
+            convId    = conv.id,
+            senderId  = from,
+            msgType   = MessageType.Text,
+            protos    = Seq(protos),
+            localTime = time
+          )
+      }
+    }
 
   override def addTextMessage(convId: ConvId, text: String): Future[MessageData] = ???
 
