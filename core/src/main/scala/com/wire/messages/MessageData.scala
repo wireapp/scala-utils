@@ -28,5 +28,7 @@ sealed trait MessageType
 
 object MessageType {
   case object Text extends MessageType
+  case object AudioAsset extends MessageType
+  case object Unknown extends MessageType
 }
 

@@ -34,6 +34,8 @@ object Logging {
     }
   })
 
+  implicit def logTag = ImplicitTag.implicitLogTag
+
   def error(message: String, cause: Throwable)(implicit tag: LogTag): Unit = getLogger(tag).error(message, cause)
 
   def error(message: String)(implicit tag: LogTag): Unit = getLogger(tag).error(message)

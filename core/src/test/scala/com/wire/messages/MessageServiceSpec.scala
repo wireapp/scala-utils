@@ -1,8 +1,8 @@
 package com.wire.messages
 
 import com.wire.conversations.ConversationData
-import com.wire.data.ProtoFactory.{GenericMsg, Text}
-import com.wire.data.{GenericMsgEvent, MsgEvent, UId, UserId}
+import com.wire.data.ProtoFactory.{Asset, GenericMsg, Text}
+import com.wire.data._
 import com.wire.testutils.FullFeatureSpec
 import com.wire.utils.RichInstant
 import org.threeten.bp.Instant
@@ -36,13 +36,15 @@ class MessageServiceSpec extends FullFeatureSpec {
     }
   }
 
-  scenario("Ignore com.wire.history.events before conversation cleared time") {
+  scenario("Ignore events before conversation cleared time") {
     val clearTime = Instant.now
-    val conv = ConversationData(lastCleared = clearTime)
-    val sender = UserId()
+    implicit val conv = ConversationData(lastCleared = clearTime)
+    implicit val sender = UserId()
 
-    val earlierEvents = generateEvents(conv, sender, clearTime, before = true)
-    val laterEvents = generateEvents(conv, sender, clearTime, before = false)
+    def content(count: Int) = GenericMsg(UId(), Text(s"Test $count"))
+
+    val earlierEvents = generateEvents(clearTime, before = true, content = content)
+    val laterEvents = generateEvents(clearTime, before = false, content = content)
 
     val res = Await.result(service.processEvents(conv, earlierEvents ++ laterEvents), 5.seconds)
 
@@ -55,10 +57,19 @@ class MessageServiceSpec extends FullFeatureSpec {
   }
 
   scenario("Process add asset event") {
-    val conv = ConversationData()
-    val sender = UserId()
+    implicit val conv = ConversationData()
+    implicit val sender = UserId()
 
-//    val assetEvent = GenericMessageEvent()
+    val assetEvents = generateEvents(count = 1, content = _ => GenericMsg(UId(), Asset(Mime.Audio.MP3, 1024 * 1024, Some("Audio file"))))
+
+    val res = Await.result(service.processEvents(conv, assetEvents), 5.seconds)
+
+    res should have size 1
+    res.foreach {
+      inside(_) { case MessageData(_, _, _, msgType, _, _) =>
+          msgType shouldEqual MessageType.AudioAsset
+      }
+    }
   }
 
   /**
@@ -66,15 +77,16 @@ class MessageServiceSpec extends FullFeatureSpec {
     * Each event will be given a timestamp up to count seconds before or after the given fromInstant, so as
     * not to overlap with the fromInstant.
     */
-  def generateEvents(conv: ConversationData, sender: UserId, fromTime: Instant, before: Boolean, count: Int = 3): Seq[MsgEvent] = {
+  def generateEvents(fromTime: Instant = Instant.now, before: Boolean = false, count: Int = 3, content: Int => GenericMsg)
+                    (implicit convTo: ConversationData, fromUser: UserId) : Seq[MsgEvent] = {
     def addTime(i: Int) = (if (before) -(count - (i - 1)) else i).seconds
     (1 to count).map { i =>
       GenericMsgEvent(
         UId(),
-        conv.remoteId,
+        convTo.remoteId,
         fromTime + addTime(i),
-        sender,
-        GenericMsg(UId(), Text(s"Test $count")))
+        fromUser,
+        content(count))
     }
   }
 

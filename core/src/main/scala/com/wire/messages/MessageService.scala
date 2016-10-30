@@ -1,8 +1,9 @@
 package com.wire.messages
 
 import com.wire.conversations.ConversationData
-import com.wire.data.ProtoFactory.{GenericMsg, Text}
+import com.wire.data.ProtoFactory.{Asset, GenericMsg, Text}
 import com.wire.data._
+import com.wire.logging.Logging._
 
 import scala.concurrent.Future
 
@@ -20,16 +21,24 @@ class DefaultMessageService extends MessageService {
 
     val afterCleared = events.filter(e => conv.lastCleared.isBefore(e.time))
 
-
-    afterCleared.collect {
-      case GenericMsgEvent(id, convId, time, from, protos@GenericMsg(_, Text(content))) =>
-        MessageData(
-          convId = conv.id,
-          senderId = from,
-          msgType = MessageType.Text,
-          protos = Seq(protos),
-          localTime = time
-        )
+    afterCleared.collect { case ev =>
+      verbose(s"processing event: $ev")
+      println(s"processing event: $ev")
+      ev match {
+        case GenericMsgEvent(id, convId, time, from, protos) =>
+          val msgType = protos match {
+            case GenericMsg(_, Text(_))   => MessageType.Text
+            case GenericMsg(_, Asset(_))  => MessageType.AudioAsset
+            case _                        => MessageType.Unknown
+          }
+          MessageData(
+            convId    = conv.id,
+            senderId  = from,
+            msgType   = msgType,
+            protos    = Seq(protos),
+            localTime = time
+          )
+      }
     }
   }
 
