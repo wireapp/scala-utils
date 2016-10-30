@@ -64,7 +64,7 @@ class SignalSpec extends FullFeatureSpec {
       s.hasSubscribers shouldEqual false
     }
 
-    scenario("Don't receive events after unregistering a single observer")  {
+    scenario("Don't receive com.wire.history.events after unregistering a single observer")  {
       val s = Signal(1)
       val sub = s(capture)
       s ! 2
@@ -75,7 +75,7 @@ class SignalSpec extends FullFeatureSpec {
       received shouldEqual Seq(1, 2)
     }
 
-    scenario("Don't receive events after unregistering all observers") {
+    scenario("Don't receive com.wire.history.events after unregistering all observers") {
       val s = Signal(1)
       s(capture)
       s ! 2

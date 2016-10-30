@@ -34,7 +34,7 @@ class ThrottleSignalSpec extends FullFeatureSpec {
 
   feature("Forwarding") {
 
-    scenario("throttle serial events") {
+    scenario("throttle serial com.wire.history.events") {
       val delay = 2.millis
       100 times spying { spy =>
         val s = Signal(1)
@@ -53,7 +53,7 @@ class ThrottleSignalSpec extends FullFeatureSpec {
       }
     }
 
-    scenario("throttle parallel events")(spying { spy =>
+    scenario("throttle parallel com.wire.history.events")(spying { spy =>
       import com.wire.threading.Threading.Implicits.Background
       import spy._
 

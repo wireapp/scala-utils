@@ -20,7 +20,7 @@
 
 import com.wire.macros.logging.LogTag
 
-//TODO might be nicer to group this together with tracking and have Analytics and Tracking listen reactively to events from the app
+//TODO might be nicer to group this together with tracking and have Analytics and Tracking listen reactively to com.wire.history.events from the app
 trait Analytics {
   def saveException(t: Throwable, description: String)(implicit tag: LogTag): Unit
 

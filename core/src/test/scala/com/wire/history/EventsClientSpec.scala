@@ -37,7 +37,7 @@ class EventsClientSpec extends FullFeatureSpec {
   feature("Download notifications after one trigger") {
     scenario("download last page of notifications") {
 
-      val jsonResponse = JsonObjectResponse(jsonFrom("/notifications.json"))
+      val jsonResponse = JsonObjectResponse(jsonFrom("/events/notifications.json"))
       println(jsonResponse)
 
       val since = Some(UId(lastNot - pageSize))

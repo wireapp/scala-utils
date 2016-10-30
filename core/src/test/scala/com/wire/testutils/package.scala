@@ -36,9 +36,9 @@ package object testutils {
 
   type Print = Boolean
 
-  implicit lazy val ec = Threading.Background
+  implicit lazy val ec               = Threading.Background
   implicit lazy val printVals: Print = false
-  implicit lazy val duration = 3.seconds
+  implicit lazy val duration         = 3.seconds
 
   implicit class TestInt(val a: Int) extends AnyVal {
     def times(f: => Unit): Unit = {
@@ -87,6 +87,17 @@ package object testutils {
     override protected def onUnwire(): Unit = isWired = false
   }
 
-  def jsonFrom(fileName: String) = new JSONObject(Source.fromInputStream(resourceStream(fileName)).getLines().mkString("\n"))
+  def jsonFrom(fileName: String, placeholders: Map[String, String]): JSONObject = {
+    var jsonString = Source.fromInputStream(resourceStream(fileName)).getLines().mkString("\n")
+
+    placeholders.foreach { case (key, value) =>
+      jsonString = jsonString.replace(s"#{$key}", value)
+    }
+
+    if (jsonString.contains("#{")) throw new Exception("Not all values in json were filled out")
+
+    new JSONObject(jsonString)
+  }
+  def jsonFrom(fileName: String): JSONObject = jsonFrom(fileName, Map.empty)
   def resourceStream(name: String): InputStream = getClass.getResourceAsStream(name)
 }

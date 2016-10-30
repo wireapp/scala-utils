@@ -16,19 +16,22 @@ class DefaultMessageService extends MessageService {
 
   import com.wire.threading.Threading.Implicits.Background
 
-  override private[messages] def processEvents(conv: ConversationData, events: Seq[MessageEvent]): Future[Seq[MessageData]] =
-    Future {
-      events.collect {
-        case GenericMessageEvent(id, convId, time, from, protos@GenericMessage(_, Text(content))) =>
-          MessageData(
-            convId    = conv.id,
-            senderId  = from,
-            msgType   = MessageType.Text,
-            protos    = Seq(protos),
-            localTime = time
-          )
-      }
+  override private[messages] def processEvents(conv: ConversationData, events: Seq[MessageEvent]): Future[Seq[MessageData]] = Future {
+
+    val afterCleared = events.filter(e => conv.lastCleared.isBefore(e.time))
+
+
+    afterCleared.collect {
+      case GenericMessageEvent(id, convId, time, from, protos@GenericMessage(_, Text(content))) =>
+        MessageData(
+          convId = conv.id,
+          senderId = from,
+          msgType = MessageType.Text,
+          protos = Seq(protos),
+          localTime = time
+        )
     }
+  }
 
   override def addTextMessage(convId: ConvId, text: String): Future[MessageData] = ???
 

@@ -19,5 +19,10 @@ object Event {
   }
 }
 
-sealed trait MessageEvent extends Event
+sealed trait ConversationEvent extends Event {
+  val time: Instant
+  val from: UserId
+}
+
+sealed trait MessageEvent extends ConversationEvent
 case class GenericMessageEvent(id: UId, convId: RConvId, time: Instant, from: UserId, content: GenericMessage) extends MessageEvent

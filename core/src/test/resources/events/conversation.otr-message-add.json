@@ -1,0 +1,16 @@
+{
+  "payload": [
+    {
+      "conversation": "#{conversation}",
+      "time": "#{time}",
+      "data": {
+        "text": "#{text}",
+        "sender": "#{sender}",
+        "recipient": "#{recipient}"
+      },
+      "from": "#{from}",
+      "type": "conversation.otr-message-add"
+    }
+  ],
+  "id": "#{notificationId}"
+}
