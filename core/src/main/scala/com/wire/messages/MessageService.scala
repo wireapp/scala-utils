@@ -9,20 +9,18 @@ import com.wire.logging.Logging._
 import scala.concurrent.Future
 
 trait MessageService {
-  private[messages] def processEvents(conv: ConversationData, events: Seq[MsgEvent]): Future[Seq[MessageData]]
+  private[messages] def processEvents(conv: ConversationData, events: Seq[MsgEvent]): Future[Set[MessageData]]
   def addTextMessage(convId: ConvId, text: String): Future[MessageData]
   def addAssetMessage(convId: ConvId, assetId: AssetId, mime: Mime): Future[MessageData]
 }
 
-class DefaultMessageService extends MessageService {
-
-  import com.wire.threading.Threading.Implicits.Background
-
-  override private[messages] def processEvents(conv: ConversationData, events: Seq[MsgEvent]): Future[Seq[MessageData]] = Future {
+class DefaultMessageService(content: MessageContentUpdater) extends MessageService {
+  
+  override private[messages] def processEvents(conv: ConversationData, events: Seq[MsgEvent]): Future[Set[MessageData]] = {
 
     val afterCleared = events.filter(e => conv.lastCleared.isBefore(e.time))
 
-    afterCleared.collect { case ev =>
+    content.addMessages(conv.id, afterCleared.collect { case ev =>
       verbose(s"processing event: $ev")
       ev match {
         case GenericMsgEvent(id, convId, time, from, protos @ GenericMsg(_, content)) =>
@@ -42,7 +40,7 @@ class DefaultMessageService extends MessageService {
             localTime = time
           )
       }
-    }
+    })
   }
 
   override def addTextMessage(convId: ConvId, text: String): Future[MessageData] = ???

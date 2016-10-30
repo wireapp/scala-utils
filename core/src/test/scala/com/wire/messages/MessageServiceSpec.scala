@@ -7,16 +7,12 @@ import com.wire.testutils.FullFeatureSpec
 import com.wire.utils.RichInstant
 import org.threeten.bp.Instant
 
-import scala.concurrent.Await
 import scala.concurrent.duration._
 
 class MessageServiceSpec extends FullFeatureSpec {
 
-  var service: MessageService = _
-
-  before {
-    service = new DefaultMessageService
-  }
+  val mockContentUpdater      = mock[MessageContentUpdater]
+  val service: MessageService = new DefaultMessageService(mockContentUpdater)
 
   scenario("Process message event for given conversation") {
     val conv = ConversationData()
@@ -24,16 +20,22 @@ class MessageServiceSpec extends FullFeatureSpec {
     val receivedTime = Instant.now
     val protoMessage = GenericMsg(UId(), Text("Test"))
 
-    val result = Await.result(service.processEvents(conv, Seq(GenericMsgEvent(UId(), conv.remoteId, receivedTime, sender, protoMessage))), 5.seconds)
+    (mockContentUpdater.addMessages _)
+      .expects(where { (cId, ms) =>
+        cId shouldEqual conv.id
+        ms should have size 1
+        inside(ms.head) {
+          case MessageData(_, convId, senderId, msgType, protos, localTime) =>
+            convId    shouldEqual conv.id
+            senderId  shouldEqual sender
+            msgType   shouldEqual MessageType.Text
+            protos    shouldEqual Seq(protoMessage)
+            localTime shouldEqual receivedTime
+        }
+        true
+      })
 
-    result should have size 1
-    inside(result.head) { case MessageData(_, convId, senderId, msgType, protos, localTime) =>
-      convId shouldEqual conv.id
-      senderId shouldEqual sender
-      msgType shouldEqual MessageType.Text
-      protos shouldEqual Seq(protoMessage)
-      localTime shouldEqual receivedTime
-    }
+    service.processEvents(conv, Seq(GenericMsgEvent(UId(), conv.remoteId, receivedTime, sender, protoMessage)))
   }
 
   scenario("Ignore events before conversation cleared time") {
@@ -46,14 +48,19 @@ class MessageServiceSpec extends FullFeatureSpec {
     val earlierEvents = generateEvents(clearTime, before = true, content = content)
     val laterEvents = generateEvents(clearTime, before = false, content = content)
 
-    val res = Await.result(service.processEvents(conv, earlierEvents ++ laterEvents), 5.seconds)
+    (mockContentUpdater.addMessages _)
+      .expects(where { (_, ms) =>
+        ms should have size laterEvents.size
+        ms.foreach {
+          inside(_) { case MessageData(_, _, _, _, _, time) =>
+            time should be > clearTime
+          }
+        }
+        true
+      })
 
-    res should have size laterEvents.size
-    res.foreach {
-      inside(_) { case MessageData(_, _, _, _, _, time) =>
-        time should be > clearTime
-      }
-    }
+    service.processEvents(conv, earlierEvents ++ laterEvents)
+
   }
 
   scenario("Process add asset events") {
@@ -67,28 +74,33 @@ class MessageServiceSpec extends FullFeatureSpec {
       case 4 => Asset(Mime("something"), 1024 * 1024, Some("Some other file"))
     }))
 
-    val res = Await.result(service.processEvents(conv, assetEvents), 5.seconds)
+    (mockContentUpdater.addMessages _)
+      .expects(where { (_, ms) =>
+        ms should have size 4
+        ms.zipWithIndex.foreach { case (m, i) =>
+          inside(m) { case MessageData(_, _, _, msgType, _, _) =>
+            msgType shouldEqual (i + 1 match {
+              case 1 => MessageType.AudioAsset
+              case 2 => MessageType.ImageAsset
+              case 3 => MessageType.VideoAsset
+              case 4 => MessageType.OtherAsset
+            })
+          }
+        }
+        true
+      })
 
-    res should have size 4
-    res.zipWithIndex.foreach { case (m, i) =>
-      inside(m) { case MessageData(_, _, _, msgType, _, _) =>
-          msgType shouldEqual (i + 1 match {
-            case 1 => MessageType.AudioAsset
-            case 2 => MessageType.ImageAsset
-            case 3 => MessageType.VideoAsset
-            case 4 => MessageType.OtherAsset
-          })
-      }
-    }
+    service.processEvents(conv, assetEvents)
   }
 
   /**
-    * Generates a sequence of simple GenericMessage Text Events to a given conversation from a given user.
+    * Generates a sequence of GenericMessageEvents to a given conversation from a given user, each event being
+    * defined by the content function that takes the index of the event currently being generated.
     * Each event will be given a timestamp up to count seconds before or after the given fromInstant, so as
     * not to overlap with the fromInstant.
     */
   def generateEvents(fromTime: Instant = Instant.now, before: Boolean = false, count: Int = 3, content: Int => GenericMsg)
-                    (implicit convTo: ConversationData, fromUser: UserId) : Seq[MsgEvent] = {
+                    (implicit convTo: ConversationData, fromUser: UserId): Seq[MsgEvent] = {
     def addTime(i: Int) = (if (before) -(count - (i - 1)) else i).seconds
     (1 to count).map { i =>
       GenericMsgEvent(
