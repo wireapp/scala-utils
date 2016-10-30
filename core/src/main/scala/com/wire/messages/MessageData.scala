@@ -1,7 +1,7 @@
 package com.wire.messages
 
 
-import com.wire.data.ProtoFactory.GenericMessage
+import com.wire.data.ProtoFactory.GenericMsg
 import com.wire.data.{ConvId, MessageId, UserId}
 import org.threeten.bp.Instant
 
@@ -9,7 +9,7 @@ case class MessageData(id:        MessageId           = MessageId(),
                        convId:    ConvId              = ConvId(),
                        senderId:    UserId              = UserId(),
                        msgType:   MessageType         = MessageType.Text,
-                       protos:    Seq[GenericMessage] = Seq.empty,
+                       protos:    Seq[GenericMsg] = Seq.empty,
                        localTime: Instant             = Instant.now
                       ) {
   override def toString: String =

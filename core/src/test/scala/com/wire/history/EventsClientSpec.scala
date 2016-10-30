@@ -9,6 +9,7 @@ import com.wire.network.{ClientEngine, JsonObjectResponse, Request, Response}
 import com.wire.testutils.Matchers.FutureSyntax
 import com.wire.testutils.{FullFeatureSpec, RichLatch, jsonFrom}
 import com.wire.threading.{CancellableFuture, Threading}
+import org.json.JSONObject
 
 class EventsClientSpec extends FullFeatureSpec {
 
@@ -37,7 +38,8 @@ class EventsClientSpec extends FullFeatureSpec {
   feature("Download notifications after one trigger") {
     scenario("download last page of notifications") {
 
-      val jsonResponse = JsonObjectResponse(jsonFrom("/events/notifications.json"))
+//      val jsonResponse = JsonObjectResponse(jsonFrom("/events/notifications.json"))
+      val jsonResponse = JsonObjectResponse(new JSONObject())
       println(jsonResponse)
 
       val since = Some(UId(lastNot - pageSize))

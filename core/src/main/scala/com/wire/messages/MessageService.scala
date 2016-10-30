@@ -1,7 +1,7 @@
 package com.wire.messages
 
 import com.wire.conversations.ConversationData
-import com.wire.data.ProtoFactory.{GenericMessage, Text}
+import com.wire.data.ProtoFactory.{GenericMsg, Text}
 import com.wire.data._
 
 import scala.concurrent.Future
@@ -22,7 +22,7 @@ class DefaultMessageService extends MessageService {
 
 
     afterCleared.collect {
-      case GenericMsgEvent(id, convId, time, from, protos@GenericMessage(_, Text(content))) =>
+      case GenericMsgEvent(id, convId, time, from, protos@GenericMsg(_, Text(content))) =>
         MessageData(
           convId = conv.id,
           senderId = from,

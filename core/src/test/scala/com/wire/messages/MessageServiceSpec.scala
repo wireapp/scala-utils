@@ -1,7 +1,7 @@
 package com.wire.messages
 
 import com.wire.conversations.ConversationData
-import com.wire.data.ProtoFactory.{GenericMessage, Text}
+import com.wire.data.ProtoFactory.{GenericMsg, Text}
 import com.wire.data.{GenericMsgEvent, MsgEvent, UId, UserId}
 import com.wire.testutils.FullFeatureSpec
 import com.wire.utils.RichInstant
@@ -22,7 +22,7 @@ class MessageServiceSpec extends FullFeatureSpec {
     val conv = ConversationData()
     val sender = UserId()
     val receivedTime = Instant.now
-    val protoMessage = GenericMessage(UId(), Text("Test"))
+    val protoMessage = GenericMsg(UId(), Text("Test"))
 
     val result = Await.result(service.processEvents(conv, Seq(GenericMsgEvent(UId(), conv.remoteId, receivedTime, sender, protoMessage))), 5.seconds)
 
@@ -74,7 +74,7 @@ class MessageServiceSpec extends FullFeatureSpec {
         conv.remoteId,
         fromTime + addTime(i),
         sender,
-        GenericMessage(UId(), Text(s"Test $count")))
+        GenericMsg(UId(), Text(s"Test $count")))
     }
   }
 

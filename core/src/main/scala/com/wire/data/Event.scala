@@ -3,7 +3,7 @@ package com.wire.data
 import java.util.UUID
 
 import com.wire.data.JsonDecoder._
-import com.wire.data.ProtoFactory.GenericMessage
+import com.wire.data.ProtoFactory.GenericMsg
 import com.wire.error.LoggedTry
 import org.json.JSONObject
 import org.threeten.bp.Instant
@@ -46,7 +46,7 @@ case class GenericMsgEvent(id:      UId,
                            convId:  RConvId,
                            time:    Instant,
                            from:    UserId,
-                           content: GenericMessage
+                           content: GenericMsg
                           ) extends MsgEvent
 
 case class UnknownConvEvent(id:         UId       = UId(),
