@@ -56,18 +56,28 @@ class MessageServiceSpec extends FullFeatureSpec {
     }
   }
 
-  scenario("Process add asset event") {
+  scenario("Process add asset events") {
     implicit val conv = ConversationData()
     implicit val sender = UserId()
 
-    val assetEvents = generateEvents(count = 1, content = _ => GenericMsg(UId(), Asset(Mime.Audio.MP3, 1024 * 1024, Some("Audio file"))))
+    val assetEvents = generateEvents(count = 4, content = c => GenericMsg(UId(), c match {
+      case 1 => Asset(Mime.Audio.MP3, 1024 * 1024, Some("Audio file"))
+      case 2 => Asset(Mime.Image.PNG, 1024 * 1024, Some("Image file"))
+      case 3 => Asset(Mime.Video.MP4, 1024 * 1024, Some("Video file"))
+      case 4 => Asset(Mime("something"), 1024 * 1024, Some("Some other file"))
+    }))
 
     val res = Await.result(service.processEvents(conv, assetEvents), 5.seconds)
 
-    res should have size 1
-    res.foreach {
-      inside(_) { case MessageData(_, _, _, msgType, _, _) =>
-          msgType shouldEqual MessageType.AudioAsset
+    res should have size 4
+    res.zipWithIndex.foreach { case (m, i) =>
+      inside(m) { case MessageData(_, _, _, msgType, _, _) =>
+          msgType shouldEqual (i + 1 match {
+            case 1 => MessageType.AudioAsset
+            case 2 => MessageType.ImageAsset
+            case 3 => MessageType.VideoAsset
+            case 4 => MessageType.OtherAsset
+          })
       }
     }
   }
@@ -86,7 +96,7 @@ class MessageServiceSpec extends FullFeatureSpec {
         convTo.remoteId,
         fromTime + addTime(i),
         fromUser,
-        content(count))
+        content(i))
     }
   }
 

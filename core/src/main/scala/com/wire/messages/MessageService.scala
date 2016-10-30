@@ -1,6 +1,7 @@
 package com.wire.messages
 
 import com.wire.conversations.ConversationData
+import com.wire.data.ProtoFactory.Asset.Original
 import com.wire.data.ProtoFactory.{Asset, GenericMsg, Text}
 import com.wire.data._
 import com.wire.logging.Logging._
@@ -23,13 +24,15 @@ class DefaultMessageService extends MessageService {
 
     afterCleared.collect { case ev =>
       verbose(s"processing event: $ev")
-      println(s"processing event: $ev")
       ev match {
-        case GenericMsgEvent(id, convId, time, from, protos) =>
-          val msgType = protos match {
-            case GenericMsg(_, Text(_))   => MessageType.Text
-            case GenericMsg(_, Asset(_))  => MessageType.AudioAsset
-            case _                        => MessageType.Unknown
+        case GenericMsgEvent(id, convId, time, from, protos @ GenericMsg(_, content)) =>
+          val msgType = content match {
+            case Text(_)                                           => MessageType.Text
+            case Asset(Some(Original(Mime.Audio(), _, _)), _, _)   => MessageType.AudioAsset
+            case Asset(Some(Original(Mime.Image(), _, _)), _, _)   => MessageType.ImageAsset
+            case Asset(Some(Original(Mime.Video(), _, _)), _, _)   => MessageType.VideoAsset
+            case Asset(_)                                          => MessageType.OtherAsset
+            case _                                                 => MessageType.Unknown
           }
           MessageData(
             convId    = conv.id,

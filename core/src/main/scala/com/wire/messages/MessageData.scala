@@ -27,8 +27,11 @@ case class MessageData(id:        MessageId           = MessageId(),
 sealed trait MessageType
 
 object MessageType {
-  case object Text extends MessageType
-  case object AudioAsset extends MessageType
-  case object Unknown extends MessageType
+  case object Text        extends MessageType
+  case object AudioAsset  extends MessageType
+  case object ImageAsset  extends MessageType
+  case object VideoAsset  extends MessageType
+  case object OtherAsset  extends MessageType
+  case object Unknown     extends MessageType
 }
 

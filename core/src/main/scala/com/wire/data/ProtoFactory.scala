@@ -67,6 +67,12 @@ object ProtoFactory {
           orig.size = size
           name.foreach(orig.name = _)
         }
+
+      def unapply(proto: Original): Option[(Mime, Long, Option[String])] = {
+        val name = Option(proto.name).filter(_.nonEmpty)
+        val mime = Option(proto.mimeType).filter(_.nonEmpty).fold(Mime.Unknown)(Mime(_)) //TODO get mime from (file)name if empty
+        Some(mime, proto.size, name)
+      }
     }
 
     object Status
