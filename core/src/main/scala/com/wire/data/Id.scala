@@ -84,13 +84,13 @@ object AssetId {
   }
 }
 
-case class RAssetDataId(str: String) extends Id
+case class RAssetId(str: String) extends Id
 
-object RAssetDataId {
-  val Empty = RAssetDataId("empty")
-  def apply(): RAssetDataId = Id.random()
+object RAssetId {
+  val Empty = RAssetId("empty")
+  def apply(): RAssetId = Id.random()
 
-  implicit object Id extends IdGen[RAssetDataId] {
-    override def decode(str: String) = RAssetDataId(str)
+  implicit object Id extends IdGen[RAssetId] {
+    override def decode(str: String) = RAssetId(str)
   }
 }

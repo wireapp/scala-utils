@@ -1,4 +1,4 @@
-package com.wire.history
+package com.wire.events
 
 import com.wire.data.{ClientId, Event, JsonDecoder, UId}
 import com.wire.reactive.EventStream

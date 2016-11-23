@@ -1,4 +1,4 @@
-package com.wire.history
+package com.wire.events
 
 import com.wire.storage.KeyValueStorage
 import com.wire.testutils.FullFeatureSpec

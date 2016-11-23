@@ -2,11 +2,11 @@ package com.wire.data
 
 import com.waz.model.nano.Messages
 import com.waz.model.nano.Messages.Asset.Original
+import com.wire.assets.AssetData.RemoteData
 import com.wire.assets.AssetStatus.{UploadCancelled, UploadDone, UploadFailed, UploadInProgress}
-import com.wire.assets.{AssetKey, AssetStatus, AssetToken, RemoteKey}
+import com.wire.assets.{AssetStatus, AssetToken}
 import com.wire.cryptography.{AESKey, Sha256}
 import com.wire.macros.returning
-import com.wire.utils.RichOption
 
 /**
   * @tparam A the type of the proto message's content (eg, Text, Asset etc.)
@@ -84,13 +84,13 @@ object ProtoFactory {
     object AudioMetaData
 
     type Preview = Messages.Asset.Preview
-
     object Preview
 
     object Uploaded {
-      def unapply(r: Messages.Asset.RemoteData): Option[(Option[RemoteKey], Option[AssetToken], AESKey, Sha256)] = {
-        if (r.otrKey == null || r.sha256 == null) None
-        else Some((Option(RemoteKey(r.assetId)), Option(AssetToken(r.assetToken)).filter(_.str.nonEmpty), AESKey(r.otrKey), Sha256(r.sha256)))
+      def unapply(r: Messages.Asset.RemoteData): Option[RemoteData] = {
+        //TODO can the assetId be null? It's optional in proto, but that doesn't make sense...
+        if (r.assetId == null || r.otrKey == null || r.sha256 == null) None
+        else Some(RemoteData(Option(RAssetId(r.assetId)), Option(AssetToken(r.assetToken)).filter(_.str.nonEmpty), Option(AESKey(r.otrKey)), Option(Sha256(r.sha256))))
       }
     }
 
@@ -103,24 +103,7 @@ object ProtoFactory {
     def apply(mime: Mime, size: Long, name: Option[String]): Asset =
       apply(Original(mime, size, name))
 
-    def unapply(proto: Asset): Option[(Option[Messages.Asset.Original], Option[Preview], AssetStatus)] = {
-      val status = proto.getStatusCase match {
-        case Messages.Asset.UPLOADED_FIELD_NUMBER =>
-          proto.getUploaded match {
-            case Uploaded(id, token, aesKey, sha) => UploadDone(AssetKey(id.fold2(Left(RAssetDataId.Empty), Right(_)), token, aesKey, sha))
-            case _ => UploadFailed
-          }
-        case Messages.Asset.NOT_UPLOADED_FIELD_NUMBER =>
-          proto.getNotUploaded match {
-            case Messages.Asset.CANCELLED => UploadCancelled
-            case Messages.Asset.FAILED => UploadFailed
-            case _ => UploadInProgress
-          }
-        case _ => UploadInProgress
-      }
-
-      Some(Option(proto.original), Option(proto.preview), status)
-    }
+    def unapply(proto: Asset): Option[(Option[Messages.Asset.Original], Option[Preview], AssetStatus)] = None
   }
 
   case object Unknown

@@ -2,7 +2,7 @@ package com.wire.messages
 
 
 import com.wire.data.ProtoFactory.GenericMsg
-import com.wire.data.{ConvId, MessageId, UserId}
+import com.wire.data.{AssetId, ConvId, MessageId, UserId}
 import org.threeten.bp.Instant
 
 case class MessageData(id:        MessageId           = MessageId(),
@@ -22,6 +22,8 @@ case class MessageData(id:        MessageId           = MessageId(),
       | protos:     ${protos.toString().replace("\n", "")}
       | localTime:  $localTime
     """.stripMargin
+
+  val assetId = AssetId(id.str)
 }
 
 sealed trait MessageType

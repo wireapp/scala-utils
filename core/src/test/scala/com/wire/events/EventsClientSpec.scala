@@ -1,4 +1,4 @@
-package com.wire.history
+package com.wire.events
 
 import java.util.concurrent.CountDownLatch
 

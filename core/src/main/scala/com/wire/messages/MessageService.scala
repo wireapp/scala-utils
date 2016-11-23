@@ -15,7 +15,7 @@ trait MessageService {
 }
 
 class DefaultMessageService(content: MessageContentUpdater) extends MessageService {
-  
+
   override private[messages] def processEvents(conv: ConversationData, events: Seq[MsgEvent]): Future[Set[MessageData]] = {
 
     val afterCleared = events.filter(e => conv.lastCleared.isBefore(e.time))
