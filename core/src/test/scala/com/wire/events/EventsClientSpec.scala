@@ -3,13 +3,12 @@ package com.wire.events
 import java.util.concurrent.CountDownLatch
 
 import com.wire.data.{ClientId, UId}
-import com.wire.reactive.EventContext
 import com.wire.network.Response.HttpStatus
 import com.wire.network.{ClientEngine, JsonObjectResponse, Request, Response}
+import com.wire.reactive.EventContext
 import com.wire.testutils.Matchers.FutureSyntax
-import com.wire.testutils.{FullFeatureSpec, RichLatch, jsonFrom}
+import com.wire.testutils.{BackendResponses, FullFeatureSpec, RichLatch, jsonFrom}
 import com.wire.threading.{CancellableFuture, Threading}
-import org.json.JSONObject
 
 class EventsClientSpec extends FullFeatureSpec {
 
@@ -38,17 +37,18 @@ class EventsClientSpec extends FullFeatureSpec {
   feature("Download notifications after one trigger") {
     scenario("download last page of notifications") {
 
-//      val jsonResponse = JsonObjectResponse(jsonFrom("/events/notifications.json"))
-      val jsonResponse = JsonObjectResponse(new JSONObject())
-      println(jsonResponse)
+      val lastStableId = UId(1)
+      val pageSize = 25
 
-      val since = Some(UId(lastNot - pageSize))
-      val last = Some(UId(lastNot))
+      //generate a page of pageSize notifications with ids from 1 to pageSize, and indicate there are no more
+      val nots = (1 to pageSize).map(i => BackendResponses.conversationOtrMessageAdd(notificationId = UId(i)))
+      val jsonResponse = JsonObjectResponse(BackendResponses.notificationsPageResponse(hasMore = false, nots))
 
       val mockClientEngine = mock[ClientEngine]
 
       (mockClientEngine.fetch[Unit] _)
-        .expects(EventsClient.RequestTag, Request.Get(EventsClient.notificationsPath(since, clientId, 1000)))
+        .expects(EventsClient.RequestTag, Request.Get(EventsClient.notificationsPath(Some(lastStableId), clientId, 1000)))
+        .once()
         .returning(CancellableFuture {
           Response(HttpStatus(Response.Status.Success), body = jsonResponse)
         })
@@ -57,14 +57,15 @@ class EventsClientSpec extends FullFeatureSpec {
 
       val latch = new CountDownLatch(1)
       client.onPageLoaded { ns =>
-        ns should have size pageSize
+        ns.nots should have size pageSize
+        ns.lastIdFound shouldEqual true
         latch.countDown()
       }
-      loadNotifications(client, Some(UId(lastNot - pageSize))).await() shouldEqual Some(UId(lastNot))
+      loadNotifications(client, Some(lastStableId)).await() shouldEqual Some(UId(pageSize))
       latch.awaitDefault() shouldEqual true
     }
 
-    scenario("Download a handful of notifications less than full page size") {
+    scenario("Download a handful of notifications less than the full page size") {
       val historyToFetch = 3
       clientTest(expectedPages = 1,
         pagesTest = { (ns, _) =>
@@ -138,7 +139,7 @@ class EventsClientSpec extends FullFeatureSpec {
 
     val latch = new CountDownLatch(expectedPages)
     client.onPageLoaded { ns =>
-      pagesTest(ns, expectedPages - latch.getCount.toInt + 1)
+      pagesTest(ns.nots, expectedPages - latch.getCount.toInt + 1)
       latch.countDown()
     }
     body(client)

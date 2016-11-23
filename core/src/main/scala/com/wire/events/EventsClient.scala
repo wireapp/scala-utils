@@ -1,13 +1,14 @@
 package com.wire.events
 
 import com.wire.data.{ClientId, Event, JsonDecoder, UId}
-import com.wire.reactive.EventStream
 import com.wire.logging.Logging.warn
 import com.wire.macros.logging.ImplicitTag._
 import com.wire.network._
-import com.wire.threading.{CancellableFuture, SerialDispatchQueue}
+import com.wire.reactive.EventStream
+import com.wire.threading.SerialDispatchQueue
 import org.json.JSONObject
 
+import scala.concurrent.Future
 import scala.util.control.NonFatal
 
 class EventsClient(engine: ClientEngine) {
@@ -16,7 +17,7 @@ class EventsClient(engine: ClientEngine) {
 
   implicit val dispatcher = new SerialDispatchQueue(name = "SingleRequestClient")
 
-  val onPageLoaded = EventStream[Seq[PushNotification]]()
+  val onPageLoaded = EventStream[LoadNotsResponse]()
 
   /**
     * NOTE: we should just drop any incoming triggers that occur while there is already a request underway.
@@ -27,25 +28,26 @@ class EventsClient(engine: ClientEngine) {
     * another request with the since id being the latest Id anyway, so we'll get back an empty list from BE. We could
     * alternatively check the timestamps to avoid this unnecessary request, but it's really not a big deal.
     */
-  private var currentRequest = CancellableFuture.successful(Option.empty[UId], false)
+  private var currentRequest = Future.successful(Option.empty[UId], false)
 
-  def loadNotifications(since: Option[UId], clientId: ClientId, pageSize: Int = 1000): CancellableFuture[Option[UId]] = {
+  def loadNotifications(since: Option[UId], clientId: ClientId, pageSize: Int = 1000): Future[Option[UId]] = {
 
-    def loadNextPage(lastStableId: Option[UId]): CancellableFuture[(Option[UId], Boolean)] =
+    def loadNextPage(lastStableId: Option[UId], isFirstPage: Boolean): Future[(Option[UId], Boolean)] =
       engine.fetch(RequestTag, Request.Get(notificationsPath(lastStableId, clientId, pageSize))) flatMap { r =>
         println(s"response: $r")
         r match {
-          case Response(status, _, NotificationsResponse(ns, hasMore)) =>
-            onPageLoaded ! ns
-            if (hasMore) loadNextPage(ns.lastOption.map(_.id))
-            else CancellableFuture.successful(ns.lastOption.map(_.id), false)
+          case Response(status, _, PagedNotsResponse(ns, hasMore)) =>
+            onPageLoaded ! LoadNotsResponse(ns, lastIdFound = !isFirstPage || status.isSuccess)
+
+            if (hasMore) loadNextPage(ns.lastOption.map(_.id), isFirstPage = false)
+            else Future.successful(ns.lastOption.map(_.id), false)
 
           //TODO handle failing
-          case _ => CancellableFuture.failed(new Exception("TODO - handle failing"))
+          case _ => Future.failed(new Exception("TODO - handle failing"))
         }
       }
 
-    currentRequest = if (currentRequest.isCompleted) loadNextPage(since) else currentRequest
+    currentRequest = if (currentRequest.isCompleted) loadNextPage(since, isFirstPage = true) else currentRequest
     currentRequest.map(_._1)
   }
 }
@@ -63,6 +65,12 @@ object PushNotification {
 
 object EventsClient {
 
+  /**
+    * @param lastIdFound = whether the lastStableId was included in the first page of notifications received from the BE.
+    *                   if not, the BE has probably already removed that history and we have to trigger a slow sync.
+    */
+  case class LoadNotsResponse(nots: Vector[PushNotification], lastIdFound: Boolean)
+
   def notificationsPath(since: Option[UId], client: ClientId, pageSize: Int) = {
     val args = Seq("since" -> since, "client" -> Some(client), "size" -> Some(pageSize)) collect { case (key, Some(v)) => key -> v }
     Request.query(NotificationsPath, args: _*)
@@ -71,7 +79,7 @@ object EventsClient {
   val NotificationsPath = "/notifications"
   val RequestTag = "loadNotifications"
 
-  object NotificationsResponse {
+  object PagedNotsResponse {
 
     import com.wire.data.JsonDecoder._
 
