@@ -6,7 +6,7 @@ import scala.concurrent.Future
 
 trait ClientEngine {
 
-  def fetch[A](requestName: String = "", r: Request[A]): Future[Response]
+  def fetch[A](requestName: String = "", r: Request[A]): CancellableFuture[Response]
 
 }
 

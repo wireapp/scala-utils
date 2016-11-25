@@ -1,7 +1,6 @@
 package com.wire.network
 
 import com.wire.cache.CacheService
-import com.wire.network.Response.Status
 import com.wire.network.ResponseConsumer.{ByteArrayConsumer, FileConsumer, JsonConsumer, StringConsumer}
 
 

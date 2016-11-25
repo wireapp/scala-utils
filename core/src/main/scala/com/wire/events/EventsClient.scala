@@ -5,13 +5,14 @@ import com.wire.logging.Logging.warn
 import com.wire.macros.logging.ImplicitTag._
 import com.wire.network._
 import com.wire.reactive.EventStream
-import com.wire.threading.SerialDispatchQueue
+import com.wire.threading.{CancellableFuture, SerialDispatchQueue}
+import com.wire.utils.ExponentialBackoff
 import org.json.JSONObject
 
-import scala.concurrent.Future
+import scala.concurrent.duration.Duration
 import scala.util.control.NonFatal
 
-class EventsClient(engine: ClientEngine) {
+class EventsClient(engine: ClientEngine, val backoff: ExponentialBackoff) {
 
   import EventsClient._
 
@@ -28,23 +29,32 @@ class EventsClient(engine: ClientEngine) {
     * another request with the since id being the latest Id anyway, so we'll get back an empty list from BE. We could
     * alternatively check the timestamps to avoid this unnecessary request, but it's really not a big deal.
     */
-  private var currentRequest = Future.successful(Option.empty[UId], false)
+  private var currentRequest = CancellableFuture.successful(Option.empty[UId], false)
 
-  def loadNotifications(since: Option[UId], clientId: ClientId, pageSize: Int = 1000): Future[Option[UId]] = {
+  def loadNotifications(since: Option[UId], clientId: ClientId, pageSize: Int = 1000): CancellableFuture[Option[UId]] = {
 
-    def loadNextPage(lastStableId: Option[UId], isFirstPage: Boolean): Future[(Option[UId], Boolean)] =
-      engine.fetch(RequestTag, Request.Get(notificationsPath(lastStableId, clientId, pageSize))) flatMap { r =>
-        println(s"response: $r")
-        r match {
-          case Response(status, _, PagedNotsResponse(ns, hasMore)) =>
-            onPageLoaded ! LoadNotsResponse(ns, lastIdFound = !isFirstPage || status.isSuccess)
+    def loadNextPage(lastStableId: Option[UId], isFirstPage: Boolean, attempts: Int = 0): CancellableFuture[(Option[UId], Boolean)] =
+      engine.fetch(RequestTag, Request.Get(notificationsPath(lastStableId, clientId, pageSize))) flatMap {
+        case Response(status, _, _) if status.status == Response.Status.TimeoutCode =>
+          if (attempts >= backoff.maxRetries) {
+            CancellableFuture.failed(new Exception("Request timed out after too many retries"))
+          } else {
+            warn(s"Request from backend timed out: attempting to load last page since id: $lastStableId again")
+            CancellableFuture.delay(backoff.delay(attempts))
+              .flatMap(_ => loadNextPage(lastStableId, isFirstPage, attempts + 1)) //try last page again
+          }
 
-            if (hasMore) loadNextPage(ns.lastOption.map(_.id), isFirstPage = false)
-            else Future.successful(ns.lastOption.map(_.id), false)
+        case Response(status, _, PagedNotsResponse(ns, hasMore)) =>
+          println(s"got somethign: $attempts, ns: $ns, hasMore: $hasMore")
+          onPageLoaded ! LoadNotsResponse(ns, lastIdFound = !isFirstPage || status.isSuccess)
 
-          //TODO handle failing
-          case _ => Future.failed(new Exception("TODO - handle failing"))
-        }
+          if (hasMore) loadNextPage(ns.lastOption.map(_.id), isFirstPage = false)
+          else CancellableFuture.successful(ns.lastOption.map(_.id), false)
+
+        //TODO handle failing
+        case _ =>
+          println(s"other failure: $attempts")
+          CancellableFuture.failed(new Exception("TODO - handle failing"))
       }
 
     currentRequest = if (currentRequest.isCompleted) loadNextPage(since, isFirstPage = true) else currentRequest
@@ -64,7 +74,6 @@ object PushNotification {
 }
 
 object EventsClient {
-
   /**
     * @param lastIdFound = whether the lastStableId was included in the first page of notifications received from the BE.
     *                   if not, the BE has probably already removed that history and we have to trigger a slow sync.

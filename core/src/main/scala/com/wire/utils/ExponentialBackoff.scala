@@ -7,7 +7,7 @@ import scala.util.Random
 /**
   * Calculates retry delay using randomized exponential backoff strategy.
   */
-class ExponentialBackoff(initialDelay: FiniteDuration, maxDelay: FiniteDuration) {
+class ExponentialBackoff(initialDelay: FiniteDuration, val maxDelay: FiniteDuration) {
 
   val maxRetries = ExponentialBackoff.bitsCount(maxDelay.toMillis / initialDelay.toMillis)
 
