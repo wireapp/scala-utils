@@ -28,6 +28,10 @@ lazy val core = (project in file("core"))
       "commons-codec" % "commons-codec" % "1.10",
       "com.wire" % "generic-message-proto" % "1.18.0",
       "org.threeten" % "threetenbp" % "1.3" % Provided,
+//      "org.java-websocket" % "Java-WebSocket" % "1.3.0",
+      "javax.websocket" % "javax.websocket-api" % "1.1",
+      "org.glassfish.tyrus" % "tyrus-client" % "1.13",
+      "org.glassfish.tyrus" % "tyrus-container-grizzly-client" % "1.13",
 
       //test dependencies
       "org.scalatest" %% "scalatest" % "2.2.6" % "test", //scalamock 3.2.2 is incompatible with scalatest 3.0.0

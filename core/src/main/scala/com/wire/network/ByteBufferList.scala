@@ -1,6 +1,7 @@
 package com.wire.network
 
 import java.io.File
+import java.nio.ByteBuffer
 
 //TODO implement/import JVM friendly version of this class from Koushikdutta
 trait ByteBufferList {
@@ -14,14 +15,6 @@ trait ByteBufferList {
 
 object ByteBufferList {
   def reclaim(byteBuffer: ByteBuffer): Unit = ()
-}
-
-//TODO from Java.nio
-trait ByteBuffer {
-  def remaining: Int
-  def array: Array[Byte]
-  def arrayOffset: Int
-  def position: Int
 }
 
 trait Part {
