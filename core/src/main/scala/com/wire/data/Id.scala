@@ -94,3 +94,14 @@ object RAssetId {
     override def decode(str: String) = RAssetId(str)
   }
 }
+
+case class NotifId(str: String) extends Id
+
+object NotifId {
+  val Empty = NotifId("empty")
+  def apply(): NotifId = Id.random()
+
+  implicit object Id extends IdGen[NotifId] {
+    override def decode(str: String) = NotifId(str)
+  }
+}
