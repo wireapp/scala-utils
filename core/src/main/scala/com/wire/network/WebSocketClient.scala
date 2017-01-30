@@ -43,7 +43,7 @@ trait WebSocketClient {
   def connected: Signal[Boolean]
 
   def onError: EventStream[Exception]
-  
+
   def onMessage: EventStream[ResponseContent]
 
   def send[A: ContentEncoder](msg: A): CancellableFuture[Unit]
