@@ -18,22 +18,57 @@
  */
   package com.wire.network
 
+import com.wire.data.{JsonDecoder, JsonEncoder}
 import com.wire.network.Response.Status
+import org.json.JSONObject
 
-case class ErrorResponse(code: Int, message: String, label: String) {
-  /**
-    * Returns true if retrying the request will always fail.
-    * Non-fatal errors are temporary and retrying the request with the same parameters could eventually succeed.
-    */
-  def isFatal = Status.isFatal(code)
+import scala.util.Try
 
-  // if this error should be reported to hockey
-  def shouldReportError = isFatal && code != Status.CancelledCode && code != Status.UnverifiedCode
-}
+  case class ErrorResponse(code: Int, message: String, label: String) {
+    def getCode: Int = code
+    def getLabel: String = label
+    def getMessage: String = message
 
+    /**
+      * Returns true if retrying the request will always fail.
+      * Non-fatal errors are temporary and retrying the request with the same parameters could eventually succeed.
+      */
+    def isFatal = Status.isFatal(code)
 
-object ErrorResponse {
+    // if this error should be reported to hockey
+    def shouldReportError = isFatal && code != ErrorResponse.CancelledCode && code != ErrorResponse.UnverifiedCode
+  }
 
-  val Cancelled = ErrorResponse(Status.CancelledCode, "Cancelled", "")
-  def InternalError(msg: String) = ErrorResponse(Status.InternalErrorCode, msg, "internal-error")
-}
+  object ErrorResponse {
+
+    val InternalErrorCode = 499
+    val CancelledCode = 498
+    val UnverifiedCode = 497
+    val TimeoutCode = 599
+    val ConnectionErrorCode = 598
+
+    val InternalError = ErrorResponse(InternalErrorCode, "InternalError", "")
+    val Cancelled = ErrorResponse(CancelledCode, "Cancelled", "")
+    val Unverified = ErrorResponse(UnverifiedCode, "Unverified", "")
+
+    implicit lazy val Decoder: JsonDecoder[ErrorResponse] = new JsonDecoder[ErrorResponse] {
+      import com.wire.data.JsonDecoder._
+      override def apply(implicit js: JSONObject): ErrorResponse = ErrorResponse('code, 'message, 'label)
+    }
+
+    implicit lazy val Encoder: JsonEncoder[ErrorResponse] = new JsonEncoder[ErrorResponse] {
+      override def apply(v: ErrorResponse): JSONObject = JsonEncoder { o =>
+        o.put("code", v.code)
+        o.put("message", v.message)
+        o.put("label", v.label)
+      }
+    }
+
+    def unapply(resp: ResponseContent): Option[(Int, String, String)] = resp match {
+      case JsonObjectResponse(js) => Try((js.getInt("code"), js.getString("message"), js.getString("label"))).toOption
+      case _ => None
+    }
+
+    def internalError(msg: String) = ErrorResponse(InternalError.code, msg, "internal-error")
+  }
+

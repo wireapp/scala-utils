@@ -13,28 +13,16 @@ import scala.concurrent.duration.{FiniteDuration, _}
 import scala.util.control.NonFatal
 
 trait AsyncClient {
-  def apply(uri:                      URI,
-            method:                   String,
-            body:                     RequestContent,
-            headers:                  Map[String, String],
-            followRedirect:           Boolean,
-            timeout:                  FiniteDuration,
-            decoder:                  Option[ResponseBodyDecoder],
-            downloadProgressCallback: Option[ProgressCallback]): CancellableFuture[Response]
-}
-
-class DefaultAsyncClient extends AsyncClient {
   import AsyncClient._
-  override def apply(uri:                      URI,
-                     method:                   String                      = Request.GetMethod,
-                     body:                     RequestContent              = EmptyRequestContent,
-                     headers:                  Map[String, String]         = EmptyHeaders,
-                     followRedirect:           Boolean                     = true,
-                     timeout:                  FiniteDuration              = DefaultTimeout,
-                     decoder:                  Option[ResponseBodyDecoder] = None,
-                     downloadProgressCallback: Option[ProgressCallback]    = None): CancellableFuture[Response] = ???
+  def apply(uri:                      URI,
+            method:                   String                      = Request.GetMethod,
+            body:                     RequestContent              = EmptyRequestContent,
+            headers:                  Map[String, String]         = EmptyHeaders,
+            followRedirect:           Boolean                     = true,
+            timeout:                  FiniteDuration              = DefaultTimeout,
+            decoder:                  Option[ResponseBodyDecoder] = None,
+            downloadProgressCallback: Option[ProgressCallback]    = None): CancellableFuture[Response]
 }
-
 
 object AsyncClient {
   val MultipartPostTimeout = 15.minutes

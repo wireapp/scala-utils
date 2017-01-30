@@ -18,6 +18,7 @@
  */
    package com.wire
 
+import java.net.URI
 import java.security.MessageDigest
 import java.util.Date
 import java.util.concurrent.TimeoutException
@@ -109,6 +110,11 @@ package object utils {
       val (c, ds) = ev(a)
       ds.map(d => (c, d))
     }
+  }
+
+  implicit class RichUri(val uri: URI) extends AnyVal {
+    def appendQuery(query: String) = new URI(uri.getScheme, uri.getAuthority, uri.getPath, if (uri.getQuery == null) query else s"${uri.getQuery}&$query", uri.getFragment)
+
   }
 
   implicit class RichIndexedSeq[A](val items: IndexedSeq[A]) extends AnyVal {

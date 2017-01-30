@@ -1,15 +1,25 @@
 package com.wire.auth
 
-import com.wire.auth.AuthenticationManager.{Cookie, Token}
+import java.net.URI
+
+import com.wire.auth.AuthenticationManager.Cookie
 import com.wire.auth.LoginClient.LoginResult
+import com.wire.config.BackendConfig
 import com.wire.data.{AccountId, JsonEncoder}
-import com.wire.logging.Logging.{verbose, warn}
+import com.wire.logging.Logging
+import com.wire.logging.Logging.{info, warn}
 import com.wire.macros.logging.ImplicitTag._
-import com.wire.network.ContentEncoder.JsonContentEncoder
-import com.wire.network.{ErrorResponse, Response}
+import com.wire.network.AccessTokenProvider.Token
+import com.wire.network.ContentEncoder.{EmptyRequestContent, JsonContentEncoder}
+import com.wire.network.Response.{Status, SuccessHttpStatus}
+import com.wire.network._
+import com.wire.threading.CancellableFuture.CancelException
 import com.wire.threading.{CancellableFuture, SerialDispatchQueue}
-import com.wire.utils.ExponentialBackoff
+import com.wire.utils.{ExponentialBackoff, RichUri}
 import org.json.JSONObject
+import org.threeten.bp.Instant
+
+import com.wire.utils.RichInstant
 
 import scala.concurrent.duration._
 import scala.util.control.NonFatal
@@ -22,20 +32,99 @@ trait LoginClient {
 
 }
 
-class DefaultLoginClient extends LoginClient {
+class DefaultLoginClient(client: AsyncClient, backend: BackendConfig) extends LoginClient {
   import LoginClient._
 
   private implicit val dispatcher = new SerialDispatchQueue(name = "LoginClient")
 
-  override def login(accountId: AccountId, credentials: Credentials) = ???
+  private var lastRequestTime = 0L
+  private var failedAttempts = 0
+  private var lastResponse = Status.Success
+  private var loginFuture = CancellableFuture.successful[LoginResult](Left(ErrorResponse.Cancelled))
 
-  override def access(cookie: Option[String], token: Option[Token]) = ???
+  def requestDelay =
+    if (failedAttempts == 0) Duration.Zero
+    else {
+      val minDelay = if (lastResponse == Status.RateLimiting || lastResponse == Status.LoginRateLimiting) 5.seconds else Duration.Zero
+      val nextRunTime = lastRequestTime + Throttling.delay(failedAttempts, minDelay).toMillis
+      math.max(nextRunTime - System.currentTimeMillis(), 0).millis
+    }
+
+  override def login(accountId: AccountId, credentials: Credentials): CancellableFuture[LoginResult] = throttled(loginNow(accountId, credentials))
+
+  override def access(cookie: Option[String], token: Option[Token]) = throttled(accessNow(cookie, token))
+
+  def throttled(request: => CancellableFuture[LoginResult]): CancellableFuture[LoginResult] = dispatcher {
+    loginFuture = loginFuture.recover {
+      case e: CancelException => Left(ErrorResponse.Cancelled)
+      case ex: Throwable =>
+        Logging.error("Unexpected error when trying to log in.", ex)
+        Left(ErrorResponse.internalError("Unexpected error when trying to log in: " + ex.getMessage))
+    } flatMap { _ =>
+      info(s"throttling, delay: $requestDelay")
+      CancellableFuture.delay(requestDelay)
+                  } flatMap { _ =>
+      info(s"starting request")
+      lastRequestTime = System.currentTimeMillis()
+      request map {
+        case Left(error) =>
+          failedAttempts += 1
+          lastResponse = error.getCode
+          Left(error)
+        case resp =>
+          failedAttempts = 0
+          lastResponse = Status.Success
+          resp
+      }
+                  }
+    loginFuture
+  }.flatten
+
+  def loginNow(userId: AccountId, credentials: Credentials) = {
+    info(s"trying to login: $credentials")
+    client(loginUri, Request.PostMethod, loginRequestBody(userId, credentials), timeout = timeout).map(responseHandler)
+  }
+  def accessNow(cookie: Option[String], token: Option[Token]) = {
+    val headers = token.fold(Request.EmptyHeaders)(_.headers) ++ cookie.fold(Request.EmptyHeaders)(c => Map(Cookie -> s"zuid=$c"))
+    info(s"accessNow with headers: $headers")
+    client(accessUri, Request.PostMethod, EmptyRequestContent, headers, timeout = timeout).map(responseHandler)
+  }
+
+  def requestVerificationEmail(email: EmailAddress): CancellableFuture[Either[ErrorResponse, Unit]] = {
+    client(activateSendUri, Request.PostMethod, JsonContentEncoder(JsonEncoder(_.put("email", email.str)))) map {
+      case Response(SuccessHttpStatus(), resp, _) => Right(())
+      case Response(_, _, ErrorResponse(code, msg, label)) =>
+        info(s"requestVerificationEmail failed with error: ($code, $msg, $label)")
+        Left(ErrorResponse(code, msg, label))
+      case resp =>
+        Logging.error(s"Unexpected response from resendVerificationEmail: $resp")
+        Left(ErrorResponse(400, resp.toString, "unknown"))
+    }
+  }
+
+  protected val responseHandler: PartialFunction[Response, LoginResult] = {
+    case Response(SuccessHttpStatus(), responseHeaders, JsonObjectResponse(TokenResponse(token, exp, ttype))) =>
+      info(s"receivedAccessToken: '$token', headers: $responseHeaders")
+      Right((Token(token, ttype, Instant.now + exp.seconds), getCookieFromHeaders(responseHeaders)))
+    case r @ Response(status, _, ErrorResponse(code, msg, label)) =>
+      warn(s"failed login attempt: $r")
+      Left(ErrorResponse(code, msg, label))
+    case r @ Response(status, _, _) =>
+      warn("Unexpected login response")
+      Left(ErrorResponse(status.status, s"unexpected login response: $r", ""))
+  }
+
+  protected val loginUri = new URI(s"${backend.baseUrl}$LoginPath").appendQuery("persist=true")
+  protected val accessUri = new URI(s"${backend.baseUrl}$AccessPath")
+  protected val activateSendUri = new URI(s"${backend.baseUrl}$ActivateSendPath")
 }
 
 object LoginClient {
 
   type LoginResult = Either[ErrorResponse, (Token, Cookie)]
   type AccessToken = (String, Int, String)
+
+  val timeout = 15.seconds
 
   val SetCookie = "Set-Cookie"
   val Cookie = "Cookie"
@@ -53,7 +142,7 @@ object LoginClient {
 
   def getCookieFromHeaders(headers: Response.Headers): Cookie = headers(SetCookie) flatMap {
     case header @ CookieHeader(cookie) =>
-      verbose(s"parsed cookie from header: $header, cookie: $cookie")
+      info(s"parsed cookie from header: $header, cookie: $cookie")
       Some(cookie)
     case header =>
       warn(s"Unexpected content for Set-Cookie header: $header")

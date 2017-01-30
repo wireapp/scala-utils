@@ -61,12 +61,12 @@ class StorageSpec extends FullFeatureSpec {
 
     val f2 = p2.setValue(2)
 
-    f2.raise(new Throwable("blah blah"))
+//    f2.raise(new Throwable("blah blah"))
 
 //    f1
 //    f2
 
-    Await.result(Future.collect(Seq(f1, f2)))
+//    Await.result(Future.collect(Seq(f1, f2)))
 
   }
 
