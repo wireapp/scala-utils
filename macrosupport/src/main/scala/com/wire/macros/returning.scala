@@ -16,7 +16,7 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
- package com.wire.macros
+   package com.wire.macros
 
 import scala.language.experimental.macros
 import scala.reflect.macros.blackbox.Context

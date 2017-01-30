@@ -16,7 +16,7 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
-package com.wire.threading
+  package com.wire.threading
 
 import java.util.Timer
 import java.util.concurrent.{Executor, ExecutorService, Executors}

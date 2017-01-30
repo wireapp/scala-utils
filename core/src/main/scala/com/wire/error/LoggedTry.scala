@@ -16,7 +16,7 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
- package com.wire.error
+   package com.wire.error
 
 import com.wire.logging.Analytics.NoReporting
 import com.wire.logging.{Analytics, Logging}

@@ -4,9 +4,14 @@ name := "scalautils"
 organization := "com.wire"
 version := "0.0.1"
 
+logLevel := Level.Debug
+
 scalaVersion in ThisBuild := "2.11.8"
 
 licenses in ThisBuild += ("GPL-3.0", url("https://opensource.org/licenses/GPL-3.0"))
+
+scalacOptions += "-target:jvm-1.7"
+javacOptions ++= Seq("-source", "1.7", "-target", "1.7")
 
 lazy val licenseHeaders = HeaderPlugin.autoImport.headers := Set("scala", "java", "rs") .map { _ -> GPLv3("2016", "Wire Swiss GmbH") } (collection.breakOut)
 
@@ -32,6 +37,9 @@ lazy val core = (project in file("core"))
       "javax.websocket" % "javax.websocket-api" % "1.1",
       "org.glassfish.tyrus" % "tyrus-client" % "1.13",
       "org.glassfish.tyrus" % "tyrus-container-grizzly-client" % "1.13",
+
+      //twitter utils
+      "com.twitter" %% "util-cache" % "6.39.0",
 
       //test dependencies
       "org.scalatest" %% "scalatest" % "2.2.6" % "test", //scalamock 3.2.2 is incompatible with scalatest 3.0.0
