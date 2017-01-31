@@ -22,7 +22,7 @@ import java.util.concurrent.CountDownLatch
 
 import com.wire.data.{ClientId, UId}
 import com.wire.network.Response.HttpStatus
-import com.wire.network.{ClientEngine, JsonObjectResponse, Request, Response}
+import com.wire.network.{ZNetClient, JsonObjectResponse, Request, Response}
 import com.wire.reactive.EventContext
 import com.wire.testutils.{BackendResponses, FullFeatureSpec, RichLatch}
 import com.wire.threading.{CancellableFuture, Threading}
@@ -66,10 +66,10 @@ class EventsClientSpec extends FullFeatureSpec {
       val nots = (1 to pageSize).map(i => BackendResponses.conversationOtrMessageAdd(notificationId = UId(i)))
       val jsonResponse = JsonObjectResponse(BackendResponses.notificationsPageResponse(hasMore = false, nots))
 
-      val mockClientEngine = mock[ClientEngine]
+      val mockClientEngine = mock[ZNetClient]
 
-      (mockClientEngine.fetch[Unit] _)
-        .expects(EventsClient.RequestTag, Request.Get(EventsClient.notificationsPath(Some(UId(0)), clientId, 1000)))
+      (mockClientEngine.apply[Unit] _)
+        .expects(Request.Get(EventsClient.notificationsPath(Some(UId(0)), clientId, 1000)))
         .once()
         .returning(CancellableFuture {
           Response(HttpStatus(Response.Status.Success), body = jsonResponse)
@@ -98,17 +98,17 @@ class EventsClientSpec extends FullFeatureSpec {
       val jsonResponsePage1 = JsonObjectResponse(BackendResponses.notificationsPageResponse(hasMore = true, nots.take(pageSize)))
       val jsonResponsePage2 = JsonObjectResponse(BackendResponses.notificationsPageResponse(hasMore = false, nots.drop(pageSize)))
 
-      val mockClientEngine = mock[ClientEngine]
+      val mockClientEngine = mock[ZNetClient]
 
       val expectedPathFirstPage = s"/notifications?since=${UId(0).str}&client=${clientId.str}&size=1000"
       val expectedPathSecondPage = s"/notifications?since=${UId(5).str}&client=${clientId.str}&size=1000"
-      (mockClientEngine.fetch[Unit] _)
-        .expects(*, *)
+      (mockClientEngine.apply[Unit] _)
+        .expects(*)
         .twice()
-        .onCall { (tag: String, req: Request[Unit]) =>
-          (tag, req) match {
-            case (EventsClient.RequestTag, NotificationsRequestPath(`expectedPathFirstPage`)) => CancellableFuture(Response(HttpStatus(Response.Status.Success), body = jsonResponsePage1))
-            case (EventsClient.RequestTag, NotificationsRequestPath(`expectedPathSecondPage`)) => CancellableFuture(Response(HttpStatus(Response.Status.Success), body = jsonResponsePage2))
+        .onCall { req: Request[Unit] =>
+          req match {
+            case NotificationsRequestPath(`expectedPathFirstPage`) => CancellableFuture(Response(HttpStatus(Response.Status.Success), body = jsonResponsePage1))
+            case NotificationsRequestPath(`expectedPathSecondPage`) => CancellableFuture(Response(HttpStatus(Response.Status.Success), body = jsonResponsePage2))
             case _ => CancellableFuture(Response(HttpStatus(Response.Status.Success)))
           }
         }
@@ -136,19 +136,19 @@ class EventsClientSpec extends FullFeatureSpec {
       val nots = (1 to pageSize).map(i => BackendResponses.conversationOtrMessageAdd(notificationId = UId(i)))
       val jsonResponse = JsonObjectResponse(BackendResponses.notificationsPageResponse(hasMore = false, nots))
 
-      val mockClientEngine = mock[ClientEngine]
+      val mockClientEngine = mock[ZNetClient]
 
       val expectedPath = s"/notifications?since=${UId(0).str}&client=${clientId.str}&size=1000"
       var attempts = 0
-      (mockClientEngine.fetch[Unit] _)
-        .expects(*, *)
+      (mockClientEngine.apply[Unit] _)
+        .expects(*)
         .twice()
-        .onCall { (tag: String, req: Request[Unit]) =>
-          (tag, req) match {
-            case (EventsClient.RequestTag, NotificationsRequestPath(`expectedPath`)) if attempts == 0 =>
+        .onCall { req: Request[Unit] =>
+          req match {
+            case NotificationsRequestPath(`expectedPath`) if attempts == 0 =>
               attempts = 1
               CancellableFuture(Response(HttpStatus(Response.Status.TimeoutCode)))
-            case (EventsClient.RequestTag, NotificationsRequestPath(`expectedPath`)) if attempts == 1 =>
+            case NotificationsRequestPath(`expectedPath`) if attempts == 1 =>
               attempts = 2
               CancellableFuture(Response(HttpStatus(Response.Status.Success), body = jsonResponse))
             case _ => fail()
@@ -170,14 +170,14 @@ class EventsClientSpec extends FullFeatureSpec {
 
     //TODO Dean - make exception meaningful
     scenario("Too many attempts should throw exception") {
-      val mockClientEngine = mock[ClientEngine]
+      val mockClientEngine = mock[ZNetClient]
 
       var attempts = 0
       //continual timeouts from BE
-      (mockClientEngine.fetch[Unit] _)
-        .expects(*, *)
+      (mockClientEngine.apply[Unit] _)
+        .expects(*)
         .anyNumberOfTimes()
-        .onCall((tag: String, req: Request[Unit]) => {
+        .onCall((req: Request[Unit]) => {
           attempts += 1
           println(s"attempts: $attempts")
           CancellableFuture(Response(HttpStatus(Response.Status.TimeoutCode)))

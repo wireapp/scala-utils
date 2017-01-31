@@ -71,14 +71,19 @@ class DefaultAuthenticationManager(client: LoginClient, user: CredentialsHandler
     } flatMap { _ =>
       CancellableFuture.lift(tokenPref()) flatMap {
         case Some(token: Token) if !isExpired(token) =>
-          info("Token is not expired - may cause access in background though")
-          if (shouldRefresh(token)) dispatchAccessRequest()
+          info(s"Token is not expired, returning $token")
+          if (shouldRefresh(token)) {
+            info("Token will expire soon though - should refresh - dispatching access request in background")
+            dispatchAccessRequest()
+          }
           CancellableFuture.successful(Right(token))
-        case _ =>
-          info(s"No access token, or expired, cookie: ${user.cookie}")
-          CancellableFuture.lift(user.cookie()) flatMap {
-            case Some(_) => dispatchAccessRequest()
-            case None => dispatchLoginRequest()
+        case _ => CancellableFuture.lift(user.cookie()) flatMap {
+            case Some(c) =>
+              info(s"Dispatching access request with cookie: $c")
+              dispatchAccessRequest()
+            case None =>
+              info("Dispatching login request - no cookie found")
+              dispatchLoginRequest()
           }
       }
                   }

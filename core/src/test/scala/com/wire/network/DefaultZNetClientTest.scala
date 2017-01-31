@@ -1,24 +1,45 @@
-package com.wire.auth
+package com.wire.network
 
+import com.wire.auth.{Credentials, CredentialsHandler, DefaultLoginClient, EmailAddress}
 import com.wire.config.BackendConfig
-import com.wire.data.AccountId
+import com.wire.data.{AccountId, ClientId, UId}
 import com.wire.network.AccessTokenProvider.Token
-import com.wire.network.{AsyncClient, JsonObjectResponse, Response}
 import com.wire.network.Response.{DefaultHeaders, HttpStatus}
 import com.wire.storage.Preference
 import com.wire.testutils.FullFeatureSpec
-import com.wire.threading.{CancellableFuture, SerialDispatchQueue, Threading}
+import com.wire.threading.{CancellableFuture, SerialDispatchQueue}
 import org.json.JSONObject
 import org.threeten.bp.Instant
-import com.wire.utils.RichInstant
 
 import scala.concurrent.{Await, Future}
 import scala.concurrent.duration._
+import com.wire.utils.RichInstant
 
-class DefaultAuthenticationManagerTest extends FullFeatureSpec {
+class DefaultZNetClientTest extends FullFeatureSpec {
 
 
-  scenario("Let's get started") {
+  scenario("ZNetClient test") {
+
+    val ch = new CredentialsHandler {
+      override def credentials = new Credentials {
+        override def maybeEmail = Some(EmailAddress("test@test.com"))
+        override def maybeUsername = None
+        override def addToLoginJson(o: JSONObject) = ()
+        override def maybePhone = None
+        override def canLogin = true
+        override def autoLoginOnRegistration = true
+        override def addToRegistrationJson(o: JSONObject) = ()
+        override def maybePassword = Some("password")
+      }
+
+      private implicit val dispatcher = new SerialDispatchQueue(name = "DatabaseQueue")
+
+
+
+      override val accessToken = Preference[Option[Token]](None, MockStorage.getToken, MockStorage.setToken)
+      override val cookie      = Preference[Option[String]](None, MockStorage.getCookie, MockStorage.setCookie)
+      override val userId      = AccountId("account123")
+    }
 
     val mockAsync = mock[AsyncClient]
     def returnHeaders(count: Int) = DefaultHeaders(Map(
@@ -52,40 +73,22 @@ class DefaultAuthenticationManagerTest extends FullFeatureSpec {
         Response(HttpStatus(Response.Status.Success), returnHeaders(1), returnBody(1))
       }(new SerialDispatchQueue(name = "TestAsyncClient")))
 
-    val authManager = new DefaultAuthenticationManager(new DefaultLoginClient(mockAsync, BackendConfig("https://www.someurl.com")), new CredentialsHandler {
-      override def credentials = new Credentials {
-        override def maybeEmail = Some(EmailAddress("test@test.com"))
-        override def maybeUsername = None
-        override def addToLoginJson(o: JSONObject) = ()
-        override def maybePhone = None
-        override def canLogin = true
-        override def autoLoginOnRegistration = true
-        override def addToRegistrationJson(o: JSONObject) = ()
-        override def maybePassword = Some("password")
-      }
+    val config = BackendConfig("https://www.someurl.com")
 
-      private implicit val dispatcher = new SerialDispatchQueue(name = "DatabaseQueue")
+    val client = new DefaultZNetClient(ch, mockAsync, config, new DefaultLoginClient(mockAsync, config))
 
 
 
-      override val accessToken = Preference[Option[Token]](None, MockStorage.getToken, MockStorage.setToken)
-      override val cookie      = Preference[Option[String]](None, MockStorage.getCookie, MockStorage.setCookie)
-      override val userId      = AccountId("account123")
-    })
-
-    Await.result ({
-      import Threading.Implicits.Ui
-      Future.sequence(Seq(authManager.currentToken(), authManager.currentToken()))
-    }, 10.seconds).foreach { res =>
-      println(s"Current token: $res")
-    }
-
-    Thread.sleep(5000)
-
-    println(s"token: ${Await.result(MockStorage.getToken, 5.seconds)}")
-    println(s"cookie: ${Await.result(MockStorage.getCookie, 5.seconds)}")
+    println(s"result: ${Await.result(client.apply(notificationsReq(Some(UId()), ClientId(), 1)).future, 5.seconds)}")
 
   }
+
+  //and example request
+  def notificationsReq(since: Option[UId], client: ClientId, pageSize: Int) = {
+    val args = Seq("since" -> since, "client" -> Some(client), "size" -> Some(pageSize)) collect { case (key, Some(v)) => key -> v }
+    Request.Get(Request.query("/notifications", args: _*))
+  }
+
 
   object MockStorage {
     private implicit val dispatcher = new SerialDispatchQueue(name = "StorageQueue")
@@ -107,4 +110,3 @@ class DefaultAuthenticationManagerTest extends FullFeatureSpec {
   }
 
 }
-

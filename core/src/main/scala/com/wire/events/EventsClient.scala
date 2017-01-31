@@ -30,7 +30,7 @@ import org.json.JSONObject
 import scala.concurrent.duration.Duration
 import scala.util.control.NonFatal
 
-class EventsClient(engine: ClientEngine, val backoff: ExponentialBackoff) {
+class EventsClient(engine: ZNetClient, val backoff: ExponentialBackoff) {
 
   import EventsClient._
 
@@ -52,7 +52,7 @@ class EventsClient(engine: ClientEngine, val backoff: ExponentialBackoff) {
   def loadNotifications(since: Option[UId], clientId: ClientId, pageSize: Int = 1000): CancellableFuture[Option[UId]] = {
 
     def loadNextPage(lastStableId: Option[UId], isFirstPage: Boolean, attempts: Int = 0): CancellableFuture[(Option[UId], Boolean)] =
-      engine.fetch(RequestTag, Request.Get(notificationsPath(lastStableId, clientId, pageSize))) flatMap {
+      engine.apply(Request.Get(notificationsPath(lastStableId, clientId, pageSize))) flatMap {
         case Response(status, _, _) if status.status == Response.Status.TimeoutCode =>
           if (attempts >= backoff.maxRetries) {
             CancellableFuture.failed(new Exception("Request timed out after too many retries"))

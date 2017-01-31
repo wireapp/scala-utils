@@ -114,7 +114,7 @@ package object utils {
 
   implicit class RichUri(val uri: URI) extends AnyVal {
     def appendQuery(query: String) = new URI(uri.getScheme, uri.getAuthority, uri.getPath, if (uri.getQuery == null) query else s"${uri.getQuery}&$query", uri.getFragment)
-
+    def appendPath(path: String) = new URI(uri.getScheme, uri.getAuthority, s"${uri.getPath}${if (path.startsWith("/")) "" else "/"}$path", uri.getQuery, uri.getFragment)
   }
 
   implicit class RichIndexedSeq[A](val items: IndexedSeq[A]) extends AnyVal {

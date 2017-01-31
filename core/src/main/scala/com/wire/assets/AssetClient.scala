@@ -21,7 +21,7 @@
 import com.wire.assets.AssetClient.{Retention, UploadResponse}
 import com.wire.cache.LocalData
 import com.wire.data.{Mime, RAssetId}
-import com.wire.network.ClientEngine.ErrorOrResponse
+import com.wire.network.ZNetClient.ErrorOrResponse
 import org.threeten.bp.Instant
 
 trait AssetClient {
