@@ -10,6 +10,7 @@ import com.wire.testutils.FullFeatureSpec
 import com.wire.threading.{CancellableFuture, SerialDispatchQueue, Threading}
 import org.json.JSONObject
 import org.threeten.bp.Instant
+import com.wire.utils.RichInstant
 
 import scala.concurrent.{Await, Future}
 import scala.concurrent.duration._
@@ -19,11 +20,9 @@ class DefaultAuthenticationManagerTest extends FullFeatureSpec {
 
   scenario("Let's get started") {
 
-    var updatecount = 0
-    var savedToken = Option(Token("token0", "token", Instant.now))
-    var savedCookie = Option("cookie0")
+    var updateCount = 0
 
-    val mockAync = mock[AsyncClient]
+    val mockAsync = mock[AsyncClient]
     def returnHeaders(count: Int) = DefaultHeaders(Map(
       "content-encoding"                 -> "gzip",
       "request-id"                       -> "7DXR2gKdyyHPcadmGsbJnx",
@@ -48,16 +47,16 @@ class DefaultAuthenticationManagerTest extends FullFeatureSpec {
       """.stripMargin
     ))
 
-    (mockAync.apply _)
+    (mockAsync.apply _)
       .expects(*, *, *, *, *, *, *, *)
-//      .twice()
+      .twice()
       .once()
       .returning(CancellableFuture {
-        updatecount += 1
-        Response(HttpStatus(Response.Status.Success), returnHeaders(updatecount), returnBody(updatecount))
+        updateCount += 1
+        Response(HttpStatus(Response.Status.Success), returnHeaders(updateCount), returnBody(updateCount))
       }(new SerialDispatchQueue(name = "TestAsyncClient")))
 
-    val authManager = new DefaultAuthenticationManager(new DefaultLoginClient(mockAync, BackendConfig("https://www.someurl.com")), new CredentialsHandler {
+    val authManager = new DefaultAuthenticationManager(new DefaultLoginClient(mockAsync, BackendConfig("https://www.someurl.com")), new CredentialsHandler {
       override def credentials = new Credentials {
         override def maybeEmail = Some(EmailAddress("test@test.com"))
         override def maybeUsername = None
@@ -71,28 +70,47 @@ class DefaultAuthenticationManagerTest extends FullFeatureSpec {
 
       private implicit val dispatcher = new SerialDispatchQueue(name = "DatabaseQueue")
 
-      private def delay[A](f: => A) = Future {
-        Thread.sleep(500)
-        f
-      }
 
-      override val accessToken = Preference[Option[Token]](None, delay(savedToken), {t => delay(savedToken = t)})
-      override val cookie      = Preference[Option[String]](None, delay(savedCookie), {c => delay(savedCookie = c)})
+
+      override val accessToken = Preference[Option[Token]](None, MockStorage.getToken, MockStorage.setToken)
+      override val cookie      = Preference[Option[String]](None, MockStorage.getCookie, MockStorage.setCookie)
       override val userId      = AccountId("account123")
     })
 
 
     Await.result ({
+      println("currentToken1")
       authManager.currentToken()
-//      authManager.currentToken()
+      println("currentToken2")
+      authManager.currentToken()
     }, 5.seconds)
 
     Thread.sleep(2000)
 
-    println(s"token: $savedToken")
-    println(s"cookie: $savedCookie")
+    println(s"token: ${Await.result(MockStorage.getToken, 5.seconds)}")
+    println(s"cookie: ${Await.result(MockStorage.getCookie, 5.seconds)}")
 
   }
 
+  object MockStorage {
+    private implicit val dispatcher = new SerialDispatchQueue(name = "StorageQueue")
+
+    private var savedToken = Option(Token("token0", "token", Instant.now  + 100.seconds))
+    private var savedCookie = Option("cookie0")
+
+    private def delay[A](f: => A) = Future {
+      println(s"Performing action on MockStorage on thread: ${dispatcher.name}")
+      Thread.sleep(500)
+      f
+    }
+
+    def getToken = delay(savedToken)
+    def getCookie = delay(savedCookie)
+
+    def setToken(token: Option[Token]) = delay(savedToken = token)
+    def setCookie(cookie: Option[String]) = delay(savedCookie = cookie)
+
+  }
 
 }
+

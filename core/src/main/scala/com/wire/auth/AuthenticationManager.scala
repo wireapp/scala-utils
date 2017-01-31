@@ -39,9 +39,12 @@ class DefaultAuthenticationManager(client: LoginClient, user: CredentialsHandler
 
   def currentToken() = tokenPref() flatMap {
     case Some(token) if !isExpired(token) =>
+      info(s"Non expired token: $token")
       if (shouldRefresh(token)) performLogin() // schedule login on background and don't care about the result, it's supposed to refresh the access token
       Future.successful(Right(token))
-    case _ => performLogin()
+    case token =>
+      info(s"Expired or non-existant token: $token")
+      performLogin()
   }
 
   def invalidateToken() = tokenPref() .map (_.foreach { token => tokenPref := Some(token.copy(expiresAt = Instant.EPOCH)) })(dispatcher)
@@ -68,6 +71,7 @@ class DefaultAuthenticationManager(client: LoginClient, user: CredentialsHandler
     } flatMap { _ =>
       CancellableFuture.lift(tokenPref()) flatMap {
         case Some(token: Token) if !isExpired(token) =>
+          info("Token is not expired - may cause access in background though")
           if (shouldRefresh(token)) dispatchAccessRequest()
           CancellableFuture.successful(Right(token))
         case _ =>
@@ -117,7 +121,9 @@ class DefaultAuthenticationManager(client: LoginClient, user: CredentialsHandler
         cookie.foreach(c => user.cookie := Some(c))
         CancellableFuture.successful(Right(token))
 
-      case Left(_) if closed => CancellableFuture.successful(Left(ClientClosed))
+      case Left(_) if closed =>
+        info("AuthManager is closed")
+        CancellableFuture.successful(Left(ClientClosed))
 
       case Left(err @ ErrorResponse(Cancelled.status, msg, label)) =>
         info(s"request has been cancelled")
