@@ -168,7 +168,7 @@ object Response {
 
   case class DefaultHeaders(headers: Map[String, String]) extends Headers {
 
-    override def apply(key: String): Option[String] = headers.get(key.toLowerCase)
+    override def apply(key: String): Option[String] = headers.get(key)
 
     override def foreach(key: String)(f: (String) => Unit): Unit = headers.foreach { case (_, s) => f(s) }
 

@@ -8,15 +8,16 @@ import org.json.JSONObject
 
 
 trait Credentials {
-  def canLogin: Boolean
-  def autoLoginOnRegistration: Boolean
-  def addToRegistrationJson(o: JSONObject): Unit
-  def addToLoginJson(o: JSONObject): Unit
+  def canLogin: Boolean = true
+  def autoLoginOnRegistration: Boolean = true
+  def addToRegistrationJson(o: JSONObject): Unit = ()
 
-  def maybeEmail: Option[EmailAddress]
-  def maybePhone: Option[PhoneNumber]
-  def maybePassword: Option[String]
-  def maybeUsername: Option[Handle]
+  val email = Option.empty[EmailAddress]
+  val phone = Option.empty[PhoneNumber]
+  val password = Option.empty[String]
+  val username = Option.empty[Handle]
+
+  override def toString = s"Credentials: email: $email, password: $password"
 }
 
 

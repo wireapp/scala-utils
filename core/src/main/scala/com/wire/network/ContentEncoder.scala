@@ -24,7 +24,6 @@ import com.wire.data.JsonEncoder
 import com.wire.network.ContentEncoder.RequestContent
 import org.json.JSONObject
 
-
 trait ContentEncoder[A] {
   self =>
   def apply(data: A): RequestContent
@@ -40,11 +39,17 @@ object ContentEncoder {
 
   case object EmptyRequestContent extends RequestContent
 
-  trait ByteArrayRequestContent extends RequestContent
+  trait ByteArrayRequestContent extends RequestContent {
+    val data: Array[Byte]
+    val contentType: String
+
+    //TODO size limit this - converting large binary data to a string will block hard
+    override def toString = s"ContentBody($contentType): ${new String(data)}"
+  }
 
   case class BinaryRequestContent(data: Array[Byte], contentType: String) extends ByteArrayRequestContent
 
-  case class GzippedRequestContent(bytes: Array[Byte], contentType: String) extends ByteArrayRequestContent
+  case class GzippedRequestContent(data: Array[Byte], contentType: String) extends ByteArrayRequestContent
 
   case class StreamRequestContent(stream: InputStream, contentType: String, length: Int) extends RequestContent
 

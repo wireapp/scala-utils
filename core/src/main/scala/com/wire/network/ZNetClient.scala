@@ -242,14 +242,14 @@ object ZNetClient {
       Left(ErrorResponse.internalError(s"unexpected response to $name: $resp"))
   }
 
-  class RequestHandle( val request: Request[_],
-                       val id: Int = nextId,
-                       val promise: Promise[Response] = Promise[Response](),
-                       var authRetry: Boolean = false,  // will be set to true if this request is being retried due to authorization error
-                       var cancelled: Boolean = false,
-                       var startTime: Long = 0,
-                       var retry: Int = 0,
-                       var httpFuture: Option[CancellableFuture[Response]] = None) {
+  class RequestHandle(val request: Request[_],
+                      val id: Int = nextId,
+                      val promise: Promise[Response] = Promise[Response](),
+                      var authRetry: Boolean = false, // will be set to true if this request is being retried due to authorization error
+                      var cancelled: Boolean = false,
+                      var startTime: Long = 0,
+                      var retry: Int = 0,
+                      var httpFuture: Option[CancellableFuture[Response]] = None) {
 
     def retryPolicy = request.retryPolicy
 

@@ -38,6 +38,9 @@ lazy val core = (project in file("core"))
       "org.glassfish.tyrus" % "tyrus-client" % "1.13",
       "org.glassfish.tyrus" % "tyrus-container-grizzly-client" % "1.13",
 
+      "org.apache.httpcomponents" % "httpclient" % "4.5.3",
+      "org.apache.httpcomponents" % "fluent-hc" % "4.5.3",
+
       //twitter utils
       "com.twitter" %% "util-cache" % "6.39.0",
 

@@ -137,7 +137,8 @@ object LoginClient {
 
   def loginRequestBody(user: AccountId, credentials: Credentials) = JsonContentEncoder(JsonEncoder { o =>
     o.put("label", user.str)  // this label can be later used for cookie revocation
-    credentials.addToLoginJson(o)
+    credentials.email.foreach(v => o.put("email", v.str))
+    credentials.password.foreach(v => o.put("password", v))
   })
 
   def getCookieFromHeaders(headers: Response.Headers): Cookie = headers(SetCookie) flatMap {

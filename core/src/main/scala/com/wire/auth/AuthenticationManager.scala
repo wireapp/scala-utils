@@ -121,7 +121,7 @@ class DefaultAuthenticationManager(client: LoginClient, user: CredentialsHandler
   private def dispatchRequest(request: => CancellableFuture[LoginResult], retryCount: Int = 0)(handler: ResponseHandler): CancellableFuture[Either[Status, Token]] =
     request flatMap handler.orElse {
       case Right((token, cookie)) =>
-        info(s"receivedAccessToken: '$token'")
+        info(s"received access token: '$token' and cookie: $cookie")
         tokenPref := Some(token)
         cookie.foreach(c => user.cookie := Some(c))
         CancellableFuture.successful(Right(token))

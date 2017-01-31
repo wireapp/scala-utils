@@ -54,19 +54,11 @@ class DefaultAuthenticationManagerTest extends FullFeatureSpec {
 
     val authManager = new DefaultAuthenticationManager(new DefaultLoginClient(mockAsync, BackendConfig("https://www.someurl.com")), new CredentialsHandler {
       override def credentials = new Credentials {
-        override def maybeEmail = Some(EmailAddress("test@test.com"))
-        override def maybeUsername = None
-        override def addToLoginJson(o: JSONObject) = ()
-        override def maybePhone = None
-        override def canLogin = true
-        override def autoLoginOnRegistration = true
-        override def addToRegistrationJson(o: JSONObject) = ()
-        override def maybePassword = Some("password")
+        override val email = Some(EmailAddress("test@test.com"))
+        override val password = Some("password")
       }
 
       private implicit val dispatcher = new SerialDispatchQueue(name = "DatabaseQueue")
-
-
 
       override val accessToken = Preference[Option[Token]](None, MockStorage.getToken, MockStorage.setToken)
       override val cookie      = Preference[Option[String]](None, MockStorage.getCookie, MockStorage.setCookie)
