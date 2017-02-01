@@ -5,6 +5,7 @@ import java.io.{File, PrintWriter}
 import com.wire.auth.{Credentials, CredentialsHandler, DefaultLoginClient, EmailAddress}
 import com.wire.config.BackendConfig
 import com.wire.data.{AccountId, ClientId, UId}
+import com.wire.events.EventsClient
 import com.wire.macros.returning
 import com.wire.network.AccessTokenProvider.Token
 import com.wire.network.Response.{DefaultHeaders, HttpStatus}
@@ -73,16 +74,9 @@ class DefaultZNetClientTest extends FullFeatureSpec {
 
     val client = new DefaultZNetClient(credentials, mockAsync, config, new DefaultLoginClient(mockAsync, config))
 
-    println(s"result: ${Await.result(client.apply(notificationsReq(Some(UId()), ClientId(), 1)).future, 5.seconds)}")
+    println(s"result: ${Await.result(client.apply(Request.Get(EventsClient.NotificationsPath, EventsClient.notificationsQuery(None, None, 100))).future, 5.seconds)}")
 
   }
-
-  //and example request
-  def notificationsReq(since: Option[UId], client: ClientId, pageSize: Int) = {
-    val args = Seq("since" -> since, "client" -> Some(client), "size" -> Some(pageSize)) collect { case (key, Some(v)) => key -> v }
-    Request.Get(Request.query("/notifications", args: _*))
-  }
-
 
   object MockStorage {
 
@@ -125,8 +119,7 @@ class DefaultZNetClientTest extends FullFeatureSpec {
     val async = new ApacheHTTPAsyncClient()
     val znet = new DefaultZNetClient(credentials, async, config, new DefaultLoginClient(async, config))
 
-
-    Await.result(znet(notificationsReq(Some(UId()), ClientId(), 1)).future, 5.seconds)
+    Await.result(znet(Request.Get(EventsClient.NotificationsPath, EventsClient.notificationsQuery(None, None, 100))).future, 5.seconds)
 
   }
 

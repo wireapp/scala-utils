@@ -27,7 +27,6 @@ import com.wire.threading.{CancellableFuture, SerialDispatchQueue}
 import com.wire.utils.ExponentialBackoff
 import org.json.JSONObject
 
-import scala.concurrent.duration.Duration
 import scala.util.control.NonFatal
 
 class EventsClient(engine: ZNetClient, val backoff: ExponentialBackoff) {
@@ -52,7 +51,7 @@ class EventsClient(engine: ZNetClient, val backoff: ExponentialBackoff) {
   def loadNotifications(since: Option[UId], clientId: ClientId, pageSize: Int = 1000): CancellableFuture[Option[UId]] = {
 
     def loadNextPage(lastStableId: Option[UId], isFirstPage: Boolean, attempts: Int = 0): CancellableFuture[(Option[UId], Boolean)] =
-      engine.apply(Request.Get(notificationsPath(lastStableId, clientId, pageSize))) flatMap {
+      engine.apply(Request.Get(NotificationsPath, notificationsQuery(lastStableId, Some(clientId), pageSize))) flatMap {
         case Response(status, _, _) if status.status == Response.Status.TimeoutCode =>
           if (attempts >= backoff.maxRetries) {
             CancellableFuture.failed(new Exception("Request timed out after too many retries"))
@@ -98,10 +97,8 @@ object EventsClient {
     */
   case class LoadNotsResponse(nots: Vector[PushNotification], lastIdFound: Boolean)
 
-  def notificationsPath(since: Option[UId], client: ClientId, pageSize: Int) = {
-    val args = Seq("since" -> since, "client" -> Some(client), "size" -> Some(pageSize)) collect { case (key, Some(v)) => key -> v }
-    Request.query(NotificationsPath, args: _*)
-  }
+  def notificationsQuery(since: Option[UId], client: Option[ClientId], pageSize: Int) =
+    Seq("since" -> since, "client" -> client, "size" -> Some(pageSize)).collect { case (key, Some(v)) => key -> v.toString }.toMap
 
   val NotificationsPath = "/notifications"
   val RequestTag = "loadNotifications"

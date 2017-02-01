@@ -121,7 +121,7 @@ class DefaultZNetClient(credentials: CredentialsHandler,
         ongoing += handle.id -> handle
 
         val request: Request[_] = handle.request
-        val uri = request.resourcePath.map(path => baseUri.appendPath(path)).orElse(request.absoluteUri).get
+        val uri = request.resourcePath.map(path => baseUri.appendPath(path).appendQuery(request.query)).orElse(request.absoluteUri).get
         val future =
           if (request.requiresAuthentication) {
             CancellableFuture.lift(auth.currentToken()) flatMap {

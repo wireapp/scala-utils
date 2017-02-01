@@ -18,7 +18,7 @@
  */
   package com.wire.network
 
-import java.net.{URI, URLEncoder}
+import java.net.URI
 
 import com.wire.download.ProgressIndicator
 import com.wire.network.ContentEncoder.{EmptyContentEncoder, EmptyRequestContent}
@@ -30,6 +30,7 @@ import scala.concurrent.duration.FiniteDuration
 
 case class Request[A: ContentEncoder](httpMethod: String = Request.GetMethod,
                                       resourcePath: Option[String] = None,
+                                      query: Map[String, String] = Map.empty,
                                       absoluteUri: Option[URI] = None,
                                       data: Option[A] = None,
                                       decoder: Option[ResponseBodyDecoder] = None,
@@ -60,22 +61,15 @@ object Request {
 
   val EmptyHeaders = Map[String, String]()
 
-  def Post[A: ContentEncoder](path: String, data: A, uploadCallback: Option[ProgressCallback] = None, requiresAuthentication: Boolean = true, headers: Map[String, String] = EmptyHeaders, timeout: FiniteDuration = Timeouts.DefaultNetworkTimeout) =
-    Request[A](PostMethod, Some(path), data = Some(data), uploadCallback = uploadCallback, requiresAuthentication = requiresAuthentication, headers = headers, timeout = timeout)
+  def Post[A: ContentEncoder](path: String, query: Map[String, String] = Map.empty, data: A, uploadCallback: Option[ProgressCallback] = None, requiresAuthentication: Boolean = true, headers: Map[String, String] = EmptyHeaders, timeout: FiniteDuration = Timeouts.DefaultNetworkTimeout) =
+    Request[A](PostMethod, Some(path), query, data = Some(data), uploadCallback = uploadCallback, requiresAuthentication = requiresAuthentication, headers = headers, timeout = timeout)
 
-  def Put[A: ContentEncoder](path: String, data: A, uploadCallback: Option[ProgressCallback] = None, requiresAuthentication: Boolean = true, headers: Map[String, String] = EmptyHeaders) =
-    Request[A](PutMethod, Some(path), data = Some(data), uploadCallback = uploadCallback, requiresAuthentication = requiresAuthentication, headers = headers)
+  def Put[A: ContentEncoder](path: String, query: Map[String, String] = Map.empty, data: A, uploadCallback: Option[ProgressCallback] = None, requiresAuthentication: Boolean = true, headers: Map[String, String] = EmptyHeaders) =
+    Request[A](PutMethod, Some(path), query, data = Some(data), uploadCallback = uploadCallback, requiresAuthentication = requiresAuthentication, headers = headers)
 
-  def Delete[A: ContentEncoder](path: String, data: Option[A] = None, requiresAuthentication: Boolean = true, headers: Map[String, String] = EmptyHeaders) =
-    Request[A](DeleteMethod, Some(path), data = data, requiresAuthentication = requiresAuthentication, headers = headers)
+  def Delete[A: ContentEncoder](path: String, query: Map[String, String] = Map.empty, data: Option[A] = None, requiresAuthentication: Boolean = true, headers: Map[String, String] = EmptyHeaders) =
+    Request[A](DeleteMethod, Some(path), query, data = data, requiresAuthentication = requiresAuthentication, headers = headers)
 
-  def Get(path: String, downloadCallback: Option[ProgressCallback] = None, requiresAuthentication: Boolean = true, headers: Map[String, String] = EmptyHeaders) =
-    Request[Unit](GetMethod, Some(path), downloadCallback = downloadCallback, requiresAuthentication = requiresAuthentication, headers = headers)(EmptyContentEncoder)
-
-  def query(path: String, args: (String, Any)*): String = {
-    args map {
-      case (key, value) =>
-        URLEncoder.encode(key, "utf8") + "=" + URLEncoder.encode(value.toString, "utf8")
-    } mkString(path + (if (path.contains('?')) "&" else "?"), "&", "")
-  }
+  def Get(path: String, query: Map[String, String] = Map.empty, downloadCallback: Option[ProgressCallback] = None, requiresAuthentication: Boolean = true, headers: Map[String, String] = EmptyHeaders) =
+    Request[Unit](GetMethod, Some(path), query, downloadCallback = downloadCallback, requiresAuthentication = requiresAuthentication, headers = headers)(EmptyContentEncoder)
 }

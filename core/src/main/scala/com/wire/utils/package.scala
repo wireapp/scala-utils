@@ -26,8 +26,10 @@ import java.util.concurrent.atomic.AtomicReference
 
 import com.wire.error.LoggedTry
 import com.wire.macros.logging.LogTag
+import com.wire.macros.returning
 import com.wire.threading.{CancellableFuture, Threading}
 import org.apache.commons.codec.binary.Base64
+import org.apache.http.client.utils.URIBuilder
 import org.threeten.bp
 import org.threeten.bp.Instant
 import org.threeten.bp.Instant.now
@@ -113,8 +115,14 @@ package object utils {
   }
 
   implicit class RichUri(val uri: URI) extends AnyVal {
-    def appendQuery(query: String) = new URI(uri.getScheme, uri.getAuthority, uri.getPath, if (uri.getQuery == null) query else s"${uri.getQuery}&$query", uri.getFragment)
-    def appendPath(path: String) = new URI(uri.getScheme, uri.getAuthority, s"${uri.getPath}${if (path.startsWith("/")) "" else "/"}$path", uri.getQuery, uri.getFragment)
+    def appendQuery(key: String, value: String) = new URIBuilder(uri).addParameter(key, value).build()
+    def appendQuery(params: Map[String, String]) = if (params.nonEmpty) {
+      returning(new URIBuilder(uri)) { b =>
+        params.foreach { case (k , v) => b.addParameter(k, v) }
+      }.build()
+    } else uri
+
+    def appendPath(path: String) = new URIBuilder(uri).setPath(path).build()
   }
 
   implicit class RichIndexedSeq[A](val items: IndexedSeq[A]) extends AnyVal {

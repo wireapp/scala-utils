@@ -21,8 +21,9 @@
 import java.util.concurrent.CountDownLatch
 
 import com.wire.data.{ClientId, UId}
+import com.wire.events.EventsClient.{NotificationsPath, notificationsQuery}
 import com.wire.network.Response.HttpStatus
-import com.wire.network.{ZNetClient, JsonObjectResponse, Request, Response}
+import com.wire.network.{JsonObjectResponse, Request, Response, ZNetClient}
 import com.wire.reactive.EventContext
 import com.wire.testutils.{BackendResponses, FullFeatureSpec, RichLatch}
 import com.wire.threading.{CancellableFuture, Threading}
@@ -69,7 +70,7 @@ class EventsClientSpec extends FullFeatureSpec {
       val mockClientEngine = mock[ZNetClient]
 
       (mockClientEngine.apply[Unit] _)
-        .expects(Request.Get(EventsClient.notificationsPath(Some(UId(0)), clientId, 1000)))
+        .expects(Request.Get(NotificationsPath, notificationsQuery(Some(UId(0)), Some(clientId), 1000)))
         .once()
         .returning(CancellableFuture {
           Response(HttpStatus(Response.Status.Success), body = jsonResponse)
@@ -199,7 +200,7 @@ class EventsClientSpec extends FullFeatureSpec {
 
   object NotificationsRequestPath {
     def unapply(req: Request[_]): Option[String] = req match {
-      case Request(Request.GetMethod, path, _, _, _, _, _, _, _, _, _, _) => path
+      case Request(Request.GetMethod, path, _, _, _, _, _, _, _, _, _, _, _) => path
       case _ => None
     }
   }

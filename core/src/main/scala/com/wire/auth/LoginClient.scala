@@ -114,7 +114,7 @@ class DefaultLoginClient(client: AsyncClient, backend: BackendConfig) extends Lo
       Left(ErrorResponse(status.status, s"unexpected login response: $r", ""))
   }
 
-  protected val loginUri = new URI(s"${backend.baseUrl}$LoginPath").appendQuery("persist=true")
+  protected val loginUri = new URI(s"${backend.baseUrl}$LoginPath").appendQuery("persist", "true")
   protected val accessUri = new URI(s"${backend.baseUrl}$AccessPath")
   protected val activateSendUri = new URI(s"${backend.baseUrl}$ActivateSendPath")
 }
