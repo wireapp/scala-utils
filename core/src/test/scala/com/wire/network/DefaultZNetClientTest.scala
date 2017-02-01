@@ -4,7 +4,7 @@ import java.io.{File, PrintWriter}
 
 import com.wire.auth.{Credentials, CredentialsHandler, DefaultLoginClient, EmailAddress}
 import com.wire.config.BackendConfig
-import com.wire.data.{AccountId, ClientId, UId}
+import com.wire.data.AccountId
 import com.wire.events.EventsClient
 import com.wire.macros.returning
 import com.wire.network.AccessTokenProvider.Token
@@ -12,13 +12,12 @@ import com.wire.network.Response.{DefaultHeaders, HttpStatus}
 import com.wire.storage.Preference
 import com.wire.testutils.FullFeatureSpec
 import com.wire.threading.{CancellableFuture, SerialDispatchQueue}
+import com.wire.utils.RichInstant
 import org.json.JSONObject
 import org.threeten.bp.Instant
 
-import scala.concurrent.{Await, Future}
 import scala.concurrent.duration._
-import com.wire.utils.RichInstant
-
+import scala.concurrent.{Await, Future}
 import scala.util.Try
 
 class DefaultZNetClientTest extends FullFeatureSpec {
@@ -26,13 +25,13 @@ class DefaultZNetClientTest extends FullFeatureSpec {
   val credentials = new CredentialsHandler {
     override def credentials = new Credentials {
       override val email = Some(EmailAddress("dean+1@wire.com"))
-      override val password = Some("aqa123456")
+      override val password = None//Some("aqa123456")
     }
 
     private implicit val dispatcher = new SerialDispatchQueue(name = "DatabaseQueue")
 
-    override val accessToken = Preference[Option[Token]](None, MockStorage.getToken, MockStorage.setToken)
-    override val cookie      = Preference[Option[String]](None, MockStorage.getCookie, MockStorage.setCookie)
+    override val accessToken = Preference[Option[Token]](None, MemMockStorage.getToken, MemMockStorage.setToken)
+    override val cookie      = Preference[Option[String]](None, MemMockStorage.getCookie, MemMockStorage.setCookie)
     override val userId      = AccountId("77cc30d6-8790-4258-bf04-b2bfdcd9642a")
   }
 
@@ -40,45 +39,103 @@ class DefaultZNetClientTest extends FullFeatureSpec {
 
   scenario("ZNetClient test") {
 
+    val newCookie = "newCookie"
+    val newToken = "newToken"
+
     val mockAsync = mock[AsyncClient]
-    def returnHeaders(count: Int) = DefaultHeaders(Map(
-      "content-encoding"                 -> "gzip",
-      "request-id"                       -> "7DXR2gKdyyHPcadmGsbJnx",
-      "access-control-allow-credentials" -> "true",
-      "server"                           -> "nginx",
-      "access-control-expose-headers"    -> "Request-Id, Location",
-      "date"                             -> "Sat, 28 Jan 2017 14:15:20 GMT",
-      "content-length"                   -> "229",
-      "connection"                       -> "keep-alive",
-      "set-cookie"                       -> s"zuid=cookie$count; Path=/access; Expires=Sat, 08-Apr-2017 14:15:20 GMT; Domain=wire.com; HttpOnly; Secure",
-      "content-type"                     -> "application/json",
-      "strict-transport-security"        -> "max-age=31536000; preload"
+    val newCookieHeaders = DefaultHeaders(Map(
+      "set-cookie" -> s"zuid=$newCookie"
     ))
 
-    def returnBody(count: Int) = JsonObjectResponse(new JSONObject(
+    val newTokenBody = JsonObjectResponse(new JSONObject(
       s"""
          |{
          |  "expires_in": 86400,
-         |  "access_token": "token$count",
-         |  "token_type": "token"
+         |  "access_token": "$newToken",
+         |  "token_type": "Bearer"
          |}
       """.stripMargin
     ))
 
+    val invalidBody = JsonObjectResponse(new JSONObject(
+      """
+        |{
+        |   "code":403,
+        |   "message":"unknown user token",
+        |   "label":"invalid-credentials"
+        |}
+      """.stripMargin
+    ))
+
+    var callCount = 0
     (mockAsync.apply _)
       .expects(*, *, *, *, *, *, *, *)
       .anyNumberOfTimes()
-      .returning(CancellableFuture {
-        Response(HttpStatus(Response.Status.Success), returnHeaders(1), returnBody(1))
-      }(new SerialDispatchQueue(name = "TestAsyncClient")))
+      .onCall { (uri, method, body, headers, followRedirect, timeout, decoder, downloadProgressCallback)  =>
+        println(s"${callCount + 1}th call made")
+
+        val response = callCount match {
+          case 0 => Response(HttpStatus(Response.Status.Success), newCookieHeaders, newTokenBody)
+          case _ =>
+            val token = headers.get("Authorization")
+            val cookie = headers.get("Cookie")
+
+            val validToken = token.contains(s"Bearer $newToken")
+            val validCookie = cookie.forall(_ == newCookie)
+
+            if (validToken && validCookie) {
+              println("Everything was solid")
+              Response(HttpStatus(Response.Status.Success))
+            } else {
+              if (!validToken) println(s"${callCount + 1}th request had wrong token: $token")
+              if (cookie.isDefined && !validCookie) println(s"${callCount + 1}th incorrect cookie: $cookie")
+              Response(HttpStatus(Response.Status.Forbidden), body = invalidBody)
+            }
+        }
+
+        callCount += 1
+        CancellableFuture {
+          Thread.sleep(500)
+          response
+        }(new SerialDispatchQueue(name = "TestAsyncClient"))
+      }
 
     val client = new DefaultZNetClient(credentials, mockAsync, config, new DefaultLoginClient(mockAsync, config))
 
-    println(s"result: ${Await.result(client.apply(Request.Get(EventsClient.NotificationsPath, EventsClient.notificationsQuery(None, None, 100))).future, 5.seconds)}")
+    import com.wire.threading.Threading.Implicits.Background
+    val res = Future.sequence(Seq(
+      client.apply(Request.Get(EventsClient.NotificationsPath, EventsClient.notificationsQuery(None, None, 100))).future,
+      client.apply(Request.Get(EventsClient.NotificationsPath, EventsClient.notificationsQuery(None, None, 100))).future
+    ))
+
+    println(s"result: ${Await.result(res, 10.seconds)}")
+
+    println(s"token: ${Await.result(MemMockStorage.getToken, 10.seconds)}")
+    println(s"cookie: ${Await.result(MemMockStorage.getCookie, 10.seconds)}")
+
+    Thread.sleep(4000)
+  }
+
+  object MemMockStorage {
+    private implicit val dispatcher = new SerialDispatchQueue(name = "StorageQueue")
+
+    private var savedToken = Option(Token("oldToken", "Bearer", Instant.now  + 10.seconds))
+    private var savedCookie = Option("oldCookie")
+
+    private def delay[A](f: => A) = Future {
+      Thread.sleep(500)
+      f
+    }
+
+    def getToken = delay(savedToken)
+    def getCookie = delay(savedCookie)
+
+    def setToken(token: Option[Token]) = delay(savedToken = token)
+    def setCookie(cookie: Option[String]) = delay(savedCookie = cookie)
 
   }
 
-  object MockStorage {
+  object FileMockStorage {
 
     private implicit val dispatcher = new SerialDispatchQueue(name = "StorageQueue")
 
@@ -104,14 +161,19 @@ class DefaultZNetClientTest extends FullFeatureSpec {
       case Some(c) => printToFile(cookieFile) { p => p.print(c) }
       case None => printToFile(cookieFile) {_.print("")}
     }
+
+    def clear = {
+      setToken(None)
+      setCookie(None)
+    }
   }
 
   scenario("Test mock storage") {
-    MockStorage.setCookie(Some("test cookie: alkdfj"))
-    MockStorage.setToken(Some(Token("token", "type", Instant.now)))
+    FileMockStorage.setCookie(Some("test cookie: alkdfj"))
+    FileMockStorage.setToken(Some(Token("token", "type", Instant.now)))
 
-    println(Await.result(MockStorage.getCookie, 5.seconds))
-    println(Await.result(MockStorage.getToken, 5.seconds))
+    println(Await.result(FileMockStorage.getCookie, 5.seconds))
+    println(Await.result(FileMockStorage.getToken, 5.seconds))
   }
 
   scenario("Test with actual backend") { //useful for collecting real-world responses

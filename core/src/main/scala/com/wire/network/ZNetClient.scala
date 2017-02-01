@@ -125,7 +125,9 @@ class DefaultZNetClient(credentials: CredentialsHandler,
         val future =
           if (request.requiresAuthentication) {
             CancellableFuture.lift(auth.currentToken()) flatMap {
-              case Right(token) => client(uri, request.httpMethod, request.getBody, request.headers ++ token.headers, request.followRedirect, request.timeout, request.decoder, request.downloadCallback)
+              case Right(token) =>
+                info(s"Dispatching request to AsyncClient using token: $token")
+                client(uri, request.httpMethod, request.getBody, request.headers ++ token.headers, request.followRedirect, request.timeout, request.decoder, request.downloadCallback)
               case Left(status) => CancellableFuture.successful(Response(status))
             }
           } else client(uri, request.httpMethod, request.getBody, request.headers, request.followRedirect, request.timeout, request.decoder, request.downloadCallback)
