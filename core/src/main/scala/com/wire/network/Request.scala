@@ -21,7 +21,7 @@
 import java.net.URI
 
 import com.wire.download.ProgressIndicator
-import com.wire.network.ContentEncoder.{EmptyContentEncoder, EmptyRequestContent}
+import com.wire.network.ContentEncoder.{EmptyContentEncoder, EmptyRequestContent, RequestContent}
 import com.wire.network.Request.ProgressCallback
 import com.wire.network.Response.ResponseBodyDecoder
 import com.wire.utils.Timeouts
@@ -47,7 +47,7 @@ case class Request[A: ContentEncoder](httpMethod: String = Request.GetMethod,
 
   require(resourcePath.isDefined || absoluteUri.isDefined, "Either resourcePath or absoluteUri has to be specified")
 
-  def getBody = data.map(implicitly[ContentEncoder[A]].apply).getOrElse(EmptyRequestContent)
+  def getBody: RequestContent = data.map(implicitly[ContentEncoder[A]].apply).getOrElse(EmptyRequestContent)
 }
 
 object Request {

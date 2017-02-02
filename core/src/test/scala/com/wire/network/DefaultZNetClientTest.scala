@@ -1,6 +1,7 @@
 package com.wire.network
 
 import java.io.{File, PrintWriter}
+import java.util.concurrent.TimeUnit
 
 import com.wire.auth.{Credentials, CredentialsHandler, DefaultLoginClient, EmailAddress}
 import com.wire.config.BackendConfig
@@ -16,7 +17,7 @@ import com.wire.utils.RichInstant
 import org.json.JSONObject
 import org.threeten.bp.Instant
 
-import scala.concurrent.duration._
+import scala.concurrent.duration.{Duration, _}
 import scala.concurrent.{Await, Future}
 import scala.util.Try
 
@@ -113,13 +114,13 @@ class DefaultZNetClientTest extends FullFeatureSpec {
     println(s"token: ${Await.result(MemMockStorage.getToken, 10.seconds)}")
     println(s"cookie: ${Await.result(MemMockStorage.getCookie, 10.seconds)}")
 
-    Thread.sleep(4000)
+    Thread.sleep(20000)
   }
 
   object MemMockStorage {
     private implicit val dispatcher = new SerialDispatchQueue(name = "StorageQueue")
 
-    private var savedToken = Option(Token("oldToken", "Bearer", Instant.now  + 10.seconds))
+    private var savedToken = Option(Token("oldToken", "Bearer", Instant.now + 10.seconds))
     private var savedCookie = Option("oldCookie")
 
     private def delay[A](f: => A) = Future {
