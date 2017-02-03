@@ -16,16 +16,16 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
-  package com.wire.data
+package com.wire.data
 
 import java.util.UUID
 
 import com.wire.data.JsonDecoder._
 import com.wire.data.ProtoFactory.GenericMsg
 import com.wire.error.LoggedTry
+import com.wire.logging.ZLog.ImplicitTag._
 import org.json.JSONObject
 import org.threeten.bp.Instant
-import com.wire.macros.logging.ImplicitTag._
 
 import scala.util.Try
 

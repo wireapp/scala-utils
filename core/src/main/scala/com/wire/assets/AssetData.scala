@@ -27,8 +27,8 @@ import com.wire.cache.CacheKey
 import com.wire.cryptography.{AESKey, Sha256}
 import com.wire.data.Dimensions.{H, W}
 import com.wire.data._
-import com.wire.logging.Logging.verbose
-import com.wire.macros.logging.ImplicitTag._
+import com.wire.logging.ZLog._
+import com.wire.logging.ZLog.ImplicitTag._
 import org.apache.commons.codec.binary.Base64
 import org.json.JSONObject
 import org.threeten.bp.Duration

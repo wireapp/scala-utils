@@ -16,7 +16,7 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
-  package com.wire.network
+package com.wire.network
 
 import java.net.URI
 import java.nio.ByteBuffer
@@ -25,8 +25,8 @@ import javax.websocket.ClientEndpointConfig.Configurator
 import javax.websocket.MessageHandler.Whole
 import javax.websocket._
 
-import com.wire.logging.Logging.{debug, error}
-import com.wire.macros.logging.ImplicitTag._
+import com.wire.logging.ZLog.ImplicitTag._
+import com.wire.logging.ZLog._
 import com.wire.network.ContentEncoder.{BinaryRequestContent, EmptyRequestContent}
 import com.wire.reactive.{EventStream, Signal}
 import com.wire.threading.{CancellableFuture, SerialDispatchQueue, Threading}

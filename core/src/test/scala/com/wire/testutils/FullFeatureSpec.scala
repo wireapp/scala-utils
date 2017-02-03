@@ -18,6 +18,7 @@
  */
   package com.wire.testutils
 
+import com.wire.logging.{ScalaLoggingZLog, ZLog}
 import com.wire.threading.{Threading, UiDispatchQueue}
 import org.scalamock.scalatest.MockFactory
 import org.scalatest
@@ -34,6 +35,8 @@ abstract class FullFeatureSpec extends FeatureSpec with scalatest.Matchers with 
     Threading.setUiDispatchQueue(new UiDispatchQueue {
       override def execute(runnable: Runnable): Unit = runnable.run()
     })
+
+    ZLog.setZLog(new ScalaLoggingZLog)
 
   }
 

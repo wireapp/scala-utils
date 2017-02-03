@@ -16,11 +16,11 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
-  package com.wire.events
+package com.wire.events
 
 import com.wire.data.UId
-import com.wire.logging.Logging.verbose
-import com.wire.macros.logging.ImplicitTag._
+import com.wire.logging.ZLog.ImplicitTag._
+import com.wire.logging.ZLog._
 import com.wire.storage.KeyValueStorage
 import com.wire.threading.Threading
 import com.wire.utils.RichFuture

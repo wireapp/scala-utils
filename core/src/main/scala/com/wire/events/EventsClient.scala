@@ -16,11 +16,11 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
-  package com.wire.events
+package com.wire.events
 
 import com.wire.data.{ClientId, Event, JsonDecoder, UId}
-import com.wire.logging.Logging.warn
-import com.wire.macros.logging.ImplicitTag._
+import com.wire.logging.ZLog.ImplicitTag._
+import com.wire.logging.ZLog._
 import com.wire.network._
 import com.wire.reactive.EventStream
 import com.wire.threading.{CancellableFuture, SerialDispatchQueue}

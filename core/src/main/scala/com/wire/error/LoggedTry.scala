@@ -16,11 +16,11 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
-   package com.wire.error
+package com.wire.error
 
+import com.wire.logging.Analytics
 import com.wire.logging.Analytics.NoReporting
-import com.wire.logging.{Analytics, Logging}
-import com.wire.logging.Logging.warn
+import com.wire.logging.ZLog._
 import com.wire.macros.logging.LogTag
 
 import scala.util.control.NonFatal
@@ -35,7 +35,7 @@ object LoggedTry {
       if (reportError) Analytics.saveException(e, "logged try failed (non-fatal)")
       Failure(e)
     case e: Throwable =>
-      Logging.error("logged try got fatal error", e)
+      error("logged try got fatal error", e)
       if (reportError) Analytics.saveException(e, "logged try failed (fatal)")
       Failure(BoxedError(e))
   }

@@ -6,9 +6,8 @@ import com.wire.auth.AuthenticationManager.Cookie
 import com.wire.auth.LoginClient.LoginResult
 import com.wire.config.BackendConfig
 import com.wire.data.{AccountId, JsonEncoder}
-import com.wire.logging.Logging
-import com.wire.logging.Logging.{info, warn}
-import com.wire.macros.logging.ImplicitTag._
+import com.wire.logging.ZLog._
+import com.wire.logging.ZLog.ImplicitTag._
 import com.wire.network.AccessTokenProvider.Token
 import com.wire.network.ContentEncoder.{EmptyRequestContent, JsonContentEncoder}
 import com.wire.network.Response.{Status, SuccessHttpStatus}
@@ -58,7 +57,7 @@ class DefaultLoginClient(client: AsyncClient, backend: BackendConfig) extends Lo
     loginFuture = loginFuture.recover {
       case e: CancelException => Left(ErrorResponse.Cancelled)
       case ex: Throwable =>
-        Logging.error("Unexpected error when trying to log in.", ex)
+        error("Unexpected error when trying to log in.", ex)
         Left(ErrorResponse.internalError("Unexpected error when trying to log in: " + ex.getMessage))
     } flatMap { _ =>
       info(s"throttling, delay: $requestDelay")
@@ -97,7 +96,7 @@ class DefaultLoginClient(client: AsyncClient, backend: BackendConfig) extends Lo
         info(s"requestVerificationEmail failed with error: ($code, $msg, $label)")
         Left(ErrorResponse(code, msg, label))
       case resp =>
-        Logging.error(s"Unexpected response from resendVerificationEmail: $resp")
+        error(s"Unexpected response from resendVerificationEmail: $resp")
         Left(ErrorResponse(400, resp.toString, "unknown"))
     }
   }

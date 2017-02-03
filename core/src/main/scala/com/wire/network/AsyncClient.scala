@@ -3,8 +3,8 @@ package com.wire.network
 import java.net.{ConnectException, URI, UnknownHostException}
 import java.util.concurrent.TimeoutException
 
-import com.wire.logging.Logging.{info, warn}
-import com.wire.macros.logging.ImplicitTag._
+import com.wire.logging.ZLog._
+import com.wire.logging.ZLog.ImplicitTag._
 import com.wire.macros.returning
 import com.wire.network.ContentEncoder.{EmptyRequestContent, GzippedRequestContent, MultipartRequestContent, RequestContent}
 import com.wire.network.Request.ProgressCallback

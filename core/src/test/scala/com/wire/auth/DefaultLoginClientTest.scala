@@ -1,21 +1,14 @@
 package com.wire.auth
 
-import java.net.URI
-
 import com.wire.config.BackendConfig
-import com.wire.data.UId
-import com.wire.events.EventsClient
-import com.wire.logging.Logging
 import com.wire.network.AccessTokenProvider.Token
-import com.wire.network.ContentEncoder.EmptyRequestContent
-import com.wire.network.Response.{DefaultHeaders, EmptyHeaders, Headers, HttpStatus}
+import com.wire.network.Response.{DefaultHeaders, HttpStatus}
 import com.wire.network._
-import com.wire.testutils.{FullFeatureSpec, TestAsyncClient}
+import com.wire.testutils.FullFeatureSpec
 import com.wire.threading.{CancellableFuture, SerialDispatchQueue}
+import com.wire.utils.RichInstant
 import org.json.JSONObject
 import org.threeten.bp.Instant
-
-import com.wire.utils.RichInstant
 
 import scala.concurrent.Await
 import scala.concurrent.duration._

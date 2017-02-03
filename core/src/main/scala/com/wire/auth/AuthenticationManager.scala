@@ -1,13 +1,14 @@
 package com.wire.auth
 
 import com.wire.auth.LoginClient.LoginResult
-import com.wire.logging.Logging._
 import com.wire.network.AccessTokenProvider.Token
 import com.wire.network.ErrorResponse
 import com.wire.network.Response.{Cancelled, ClientClosed, HttpStatus, Status}
 import com.wire.threading.{CancellableFuture, SerialDispatchQueue}
 import com.wire.utils.RichInstant
 import org.threeten.bp.Instant
+import com.wire.logging.ZLog._
+import com.wire.logging.ZLog.ImplicitTag._
 
 import scala.concurrent.Future
 import scala.concurrent.duration._

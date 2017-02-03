@@ -23,7 +23,7 @@ import java.util.concurrent.atomic.AtomicInteger
 
 import com.wire.auth.{CredentialsHandler, DefaultAuthenticationManager, LoginClient}
 import com.wire.config.BackendConfig
-import com.wire.logging.Logging._
+import com.wire.logging.ZLog._
 import com.wire.macros.logging.LogTag
 import com.wire.network.Response._
 import com.wire.threading.CancellableFuture.CancelException
@@ -34,12 +34,12 @@ import scala.concurrent.duration.{Duration, _}
 import scala.concurrent.{ExecutionContext, Future, Promise, TimeoutException}
 import scala.util.control.NonFatal
 import scala.util.{Failure, Success}
-
 import com.wire.utils.RichUri
 
 trait ZNetClient {
 
   import ZNetClient._
+  import com.wire.logging.ZLog.ImplicitTag._
 
   def MaxConcurrentRequests = 4
 
@@ -71,6 +71,7 @@ class DefaultZNetClient(credentials: CredentialsHandler,
                         backend:     BackendConfig,
                         loginClient: LoginClient) extends ZNetClient {
   import ZNetClient._
+  import com.wire.logging.ZLog.ImplicitTag._
   private implicit val dispatcher = new SerialDispatchQueue(name = "ZNetClient")
 
   private val queue = new mutable.Queue[RequestHandle]()
@@ -126,7 +127,7 @@ class DefaultZNetClient(credentials: CredentialsHandler,
           if (request.requiresAuthentication) {
             CancellableFuture.lift(auth.currentToken()) flatMap {
               case Right(token) =>
-                info(s"Dispatching request to AsyncClient using token: $token")
+                verbose(s"Dispatching request to AsyncClient using token: $token")
                 client(uri, request.httpMethod, request.getBody, request.headers ++ token.headers, request.followRedirect, request.timeout, request.decoder, request.downloadCallback)
               case Left(status) => CancellableFuture.successful(Response(status))
             }

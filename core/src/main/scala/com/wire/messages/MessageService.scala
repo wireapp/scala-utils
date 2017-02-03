@@ -16,13 +16,14 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
-  package com.wire.messages
+package com.wire.messages
 
 import com.wire.conversations.ConversationData
 import com.wire.data.ProtoFactory.Asset.Original
 import com.wire.data.ProtoFactory.{Asset, GenericMsg, Text}
 import com.wire.data._
-import com.wire.logging.Logging._
+import com.wire.logging.ZLog.ImplicitTag._
+import com.wire.logging.ZLog._
 
 import scala.concurrent.Future
 

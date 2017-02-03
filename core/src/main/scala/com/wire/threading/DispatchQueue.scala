@@ -16,13 +16,13 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
-   package com.wire.threading
+package com.wire.threading
 
 import java.util.concurrent.ConcurrentLinkedQueue
 import java.util.concurrent.atomic.AtomicInteger
 
-import com.wire.logging.Logging.error
-import com.wire.macros.logging.{LogTag, logTagFor}
+import com.wire.logging.ZLog._
+import com.wire.macros.logging.LogTag
 
 import scala.annotation.tailrec
 import scala.concurrent.ExecutionContext

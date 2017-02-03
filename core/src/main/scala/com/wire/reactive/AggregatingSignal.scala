@@ -16,12 +16,12 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
-   package com.wire.reactive
+package com.wire.reactive
 
 import java.util.concurrent.atomic.AtomicReference
 
-import com.wire.logging.Logging.{error, verbose}
-import com.wire.macros.logging.ImplicitTag._
+import com.wire.logging.ZLog.ImplicitTag._
+import com.wire.logging.ZLog._
 import com.wire.threading.Threading
 
 import scala.concurrent.{ExecutionContext, Future}

@@ -16,15 +16,14 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
-   package com.wire.reactive
+package com.wire.reactive
 
 import java.util.UUID.randomUUID
 
-import com.wire.reactive.Events.Subscriber
-import com.wire.logging.Logging.error
-import com.wire.macros.logging.{LogTag, logTagFor}
-import com.wire.macros.logging.ImplicitTag._
+import com.wire.logging.ZLog.ImplicitTag._
+import com.wire.logging.ZLog._
 import com.wire.macros.returning
+import com.wire.reactive.Events.Subscriber
 import com.wire.threading.{CancellableFuture, Serialized, Threading}
 
 import scala.concurrent.{ExecutionContext, Future, Promise}
@@ -113,9 +112,6 @@ class FutureEventStream[E, V](source: EventStream[E], f: E => Future[V]) extends
       case Failure(t: NoSuchElementException) => // do nothing to allow Future.filter/collect
       case Failure(t) => error("async map failed", t)
     }(sourceContext.orElse(executionContext).getOrElse(Threading.Background)))
-}
-object FutureEventStream {
-  private implicit val logTag: LogTag = logTagFor(FutureEventStream)
 }
 
 class CollectEventStream[E, V](source: EventStream[E], pf: PartialFunction[E, V]) extends ProxyEventStream[E, V](source) {

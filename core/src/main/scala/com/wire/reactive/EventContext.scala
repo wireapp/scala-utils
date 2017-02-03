@@ -16,13 +16,12 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
-   package com.wire.reactive
+package com.wire.reactive
 
-import com.wire.logging.Logging.verbose
-import com.wire.macros.logging.{LogTag, logTagFor}
+import com.wire.logging.ZLog.ImplicitTag._
+import com.wire.logging.ZLog._
 
 trait EventContext {
-  private implicit val logTag: LogTag = logTagFor[EventContext]
 
   private object lock
 
