@@ -16,7 +16,7 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
-  package com.wire.data
+package com.wire.data
 
 /*
  * Wire
@@ -74,5 +74,9 @@ object Cleanup {
 
   implicit lazy val CloseableCleanup: Cleanup[Closeable] = new Cleanup[Closeable] {
     def apply(a: Closeable): Unit = a.close()
+  }
+
+  implicit lazy val AutoCloseableCleanup: Cleanup[AutoCloseable] = new Cleanup[AutoCloseable] {
+    def apply(a: AutoCloseable): Unit = a.close()
   }
 }

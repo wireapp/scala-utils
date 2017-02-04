@@ -16,47 +16,99 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
-  package com.wire.db
+package com.wire.db
 
+import java.sql.ResultSet
+
+import com.wire.data.Managed
 import com.wire.macros.logging.LogTag
+import com.wire.macros.returning
 import com.wire.threading._
 
 import scala.concurrent.Future
 
 trait Database {
 
-  implicit val dispatcher: SerialDispatchQueue
+  import Database._
 
-  implicit val dbHelper: DatabaseOpenHelper
+  implicit val dispatcher: SerialDispatchQueue
 
   lazy val readExecutionContext: DispatchQueue = new UnlimitedDispatchQueue(Threading.IO, name = "Database_readQueue_" + hashCode().toHexString)
 
-  def apply[A](f: DatabaseEngine => A)(implicit logTag: LogTag = ""): CancellableFuture[A] = dispatcher {
-    implicit val db = dbHelper.getWritableDatabase
-    inTransaction(f(db))
+  def apply[A](f: => A)(implicit logTag: LogTag = ""): CancellableFuture[A] = dispatcher {
+    inTransaction(f)
   } ("Database_" + logTag)
 
-  def withTransaction[A](f: DatabaseEngine => A)(implicit logTag: LogTag = ""): CancellableFuture[A] = apply(f)
+  def withTransaction[A](f: => A)(implicit logTag: LogTag = ""): CancellableFuture[A] = apply(f)
 
-  def read[A](f: DatabaseEngine => A): Future[A] = Future {
-    implicit val db = dbHelper.getWritableDatabase
-    inReadTransaction(f(db))
+  def read[A](f: => A): Future[A] = Future {
+    inReadTransaction(f)
   } (readExecutionContext)
 
-  def close() = dispatcher {
-    dbHelper.close()
-  }
-}
-
-//TODO think of a more general way of handling this
-trait DatabaseEngine {
   def setTransactionSuccessful(): Unit
+
   def endTransaction(): Unit
+
   def beginTransactionNonExclusive(): Unit
-  def inTransaction(): Boolean
+
+  def isInTransaction: Boolean
+
+  def close(): Unit
+
+  def execSQL(createSql: String): Unit
+
+  def query(tableName:     String,
+            columns:       Set[String] = Set.empty,
+            selection:     String      = "",
+            selectionArgs: Seq[String] = Seq.empty,
+            groupBy:       String      = "",
+            having:        String      = "",
+            orderBy:       String      = "",
+            limit:         String      = ""
+           ): ResultSet
+
+  def delete(tableName: String, whereClaus: String, whereArgs: Seq[String]): Int
+
+  def insertWithOnConflict(tableName: String, nullColumnHack: String, initialValues: ContentValues, conflictAlgorithm: Int) = Long
+
+  def inTransaction[A](body: => A): A = inTransaction(_ => body)
+
+  def inTransaction[A](body: Transaction => A): A = {
+    val tr = new Transaction(this)
+    if (isInTransaction) body(tr)
+    else {
+      beginTransactionNonExclusive()
+      try returning(body(tr)) { _ => setTransactionSuccessful() }
+      finally endTransaction()
+    }
+  }
+
+  def inReadTransaction[A](body: => A): A =
+    if (isInTransaction) body
+    else {
+      beginTransactionNonExclusive()
+      try returning(body) { _ => setTransactionSuccessful() }
+      finally endTransaction()
+    }
 }
 
-trait DatabaseOpenHelper {
-  def getWritableDatabase: DatabaseEngine
-  def close(): Unit
+object Database {
+
+  def iteratingWithReader[A](reader: Reader[A])(c: => ResultSet): Managed[Iterator[A]] = Managed(c).map(new ResultSetIterator[A](_)(reader))
+
+  val ConflictRollback = 1
+  val ConflictAbort = 2
+  val ConflictFail = 3
+  val ConflictIgnore = 4
+  val ConflictReplace = 5
+
+  type ContentValues = Map[String, String]
+
+  class Transaction(db: Database) {
+    def flush() = {
+      db.setTransactionSuccessful()
+      db.endTransaction()
+      db.beginTransactionNonExclusive()
+    }
+  }
 }

@@ -41,8 +41,9 @@ lazy val core = (project in file("core"))
       "org.apache.httpcomponents" % "httpclient" % "4.5.3",
       "org.apache.httpcomponents" % "fluent-hc" % "4.5.3",
 
-      //twitter utils
       "com.twitter" %% "util-cache" % "6.39.0",
+
+      "org.xerial" % "sqlite-jdbc" % "3.15.1",
 
       //test dependencies
       "org.scalatest" %% "scalatest" % "2.2.6" % "test", //scalamock 3.2.2 is incompatible with scalatest 3.0.0
