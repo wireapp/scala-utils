@@ -23,7 +23,7 @@ import scala.concurrent.Future
 import com.wire.utils.RichFuture
 
 object Serialized {
-  private implicit val dispatcher = new SerialDispatchQueue(name = "Serializing")
+  private implicit val dispatcher = new SerialDispatchQueue()("Serializing")
   
   private val locks = new mutable.HashMap[Any, Future[_]]
   

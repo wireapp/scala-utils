@@ -330,7 +330,7 @@ class FoldLeftSignal[A, B](sources: Signal[A]*)(v: B)(f: (B, A) => B) extends Pr
 }
 
 class RefreshingSignal[A, B](loader: => CancellableFuture[A], refreshEvent: EventStream[B]) extends Signal[A] {
-  private val queue = new SerialDispatchQueue(name = "RefreshingSignal")
+  private val queue = new SerialDispatchQueue
 
   @volatile private var loadFuture = CancellableFuture.cancelled[Unit]()
   @volatile private var subscription = Option.empty[Subscription]

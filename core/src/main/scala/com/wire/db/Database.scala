@@ -60,7 +60,7 @@ trait Database {
 class SQLiteDatabase(dbFile: File) extends Database {
 
   //TODO handle multiple threads/connections at some point
-  lazy val dispatcher = new SerialDispatchQueue(Threading.IO, name = "Database_queue" + hashCode().toHexString)
+  lazy val dispatcher = new SerialDispatchQueue(Threading.IO)
 
   new File(dbFile.getParent).mkdirs()
   dbFile.createNewFile()

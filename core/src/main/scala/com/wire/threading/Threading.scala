@@ -57,12 +57,12 @@ object Threading {
   /**
     * Thread pool for non-blocking background tasks.
     */
-  val ThreadPool: DispatchQueue = new LimitedDispatchQueue(Cpus, executionContext(Executors.newCachedThreadPool()), "CpuThreadPool")
+  val ThreadPool: DispatchQueue = new LimitedDispatchQueue(Cpus, executionContext(Executors.newCachedThreadPool()))("CpuThreadPool")
 
   /**
     * Thread pool for blocking IO tasks.
     */
-  val IOThreadPool: DispatchQueue = new LimitedDispatchQueue(Cpus, executionContext(Executors.newCachedThreadPool()), "IoThreadPool")
+  val IOThreadPool: DispatchQueue = new LimitedDispatchQueue(Cpus, executionContext(Executors.newCachedThreadPool()))("IoThreadPool")
 
   val Background = ThreadPool
 
@@ -86,7 +86,7 @@ object Threading {
   /**
     * Image decoding/encoding dispatch queue. This operations are quite cpu intensive, we don't want them to use all cores (leaving one spare core for other tasks).
     */
-  val ImageDispatcher = new LimitedDispatchQueue(Cpus - 1, ThreadPool, "ImageDispatcher")
+  val ImageDispatcher = new LimitedDispatchQueue(Cpus - 1, ThreadPool)("ImageDispatcher")
 
   //  lazy val BackgroundHandler: Future[Handler] = {
   //    val looper = Promise[Looper]

@@ -20,5 +20,8 @@ local.properties
 # Intellij module files
 *.iml
 
+#local databases
+*.db
+
 .idea
 out/

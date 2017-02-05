@@ -27,7 +27,7 @@ class DefaultAuthenticationManager(client: LoginClient, user: CredentialsHandler
 
   import AuthenticationManager._
 
-  implicit val dispatcher = new SerialDispatchQueue(name = "AuthenticationManager")
+  implicit val dispatcher = new SerialDispatchQueue
 
   private var closed = false
 

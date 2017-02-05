@@ -72,7 +72,7 @@ class DefaultZNetClient(credentials: CredentialsHandler,
                         loginClient: LoginClient) extends ZNetClient {
   import ZNetClient._
   import com.wire.logging.ZLog.ImplicitTag._
-  private implicit val dispatcher = new SerialDispatchQueue(name = "ZNetClient")
+  private implicit val dispatcher = new SerialDispatchQueue()
 
   private val queue = new mutable.Queue[RequestHandle]()
   private val ongoing = new mutable.HashMap[Int, RequestHandle]()

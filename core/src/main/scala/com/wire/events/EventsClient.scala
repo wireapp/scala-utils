@@ -33,7 +33,7 @@ class EventsClient(engine: ZNetClient, val backoff: ExponentialBackoff) {
 
   import EventsClient._
 
-  implicit val dispatcher = new SerialDispatchQueue(name = "SingleRequestClient")
+  implicit val dispatcher = new SerialDispatchQueue
 
   val onPageLoaded = EventStream[LoadNotsResponse]()
 

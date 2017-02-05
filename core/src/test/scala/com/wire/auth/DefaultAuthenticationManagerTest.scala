@@ -50,7 +50,7 @@ class DefaultAuthenticationManagerTest extends FullFeatureSpec {
       .anyNumberOfTimes()
       .returning(CancellableFuture {
         Response(HttpStatus(Response.Status.Success), returnHeaders(1), returnBody(1))
-      }(new SerialDispatchQueue(name = "TestAsyncClient")))
+      }(new SerialDispatchQueue()("TestAsyncClient")))
 
     val authManager = new DefaultAuthenticationManager(new DefaultLoginClient(mockAsync, BackendConfig("https://www.someurl.com")), new CredentialsHandler {
       override def credentials = new Credentials {
@@ -58,7 +58,7 @@ class DefaultAuthenticationManagerTest extends FullFeatureSpec {
         override val password = Some("password")
       }
 
-      private implicit val dispatcher = new SerialDispatchQueue(name = "DatabaseQueue")
+      private implicit val dispatcher = new SerialDispatchQueue()("DatabaseQueue")
 
       override val accessToken = Preference[Option[Token]](None, MockStorage.getToken, MockStorage.setToken)
       override val cookie      = Preference[Option[String]](None, MockStorage.getCookie, MockStorage.setCookie)
@@ -80,7 +80,7 @@ class DefaultAuthenticationManagerTest extends FullFeatureSpec {
   }
 
   object MockStorage {
-    private implicit val dispatcher = new SerialDispatchQueue(name = "StorageQueue")
+    private implicit val dispatcher = new SerialDispatchQueue()("StorageQueue")
 
     private var savedToken = Option(Token("token0", "token", Instant.now  + 10.seconds))
     private var savedCookie = Option("cookie0")

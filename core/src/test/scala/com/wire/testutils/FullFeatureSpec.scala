@@ -19,7 +19,7 @@
   package com.wire.testutils
 
 import com.wire.logging.{ScalaLoggingZLog, ZLog}
-import com.wire.threading.{Threading, UiDispatchQueue}
+import com.wire.threading.{DispatchQueueStats, Threading, UiDispatchQueue}
 import org.scalamock.scalatest.MockFactory
 import org.scalatest
 import org.scalatest._
@@ -38,6 +38,9 @@ abstract class FullFeatureSpec extends FeatureSpec with scalatest.Matchers with 
 
     ZLog.setZLog(new ScalaLoggingZLog)
 
+    DispatchQueueStats.LogLevel = DispatchQueueStats.Verbose
+
   }
 
 }
+

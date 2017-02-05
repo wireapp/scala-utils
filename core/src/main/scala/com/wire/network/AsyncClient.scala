@@ -35,7 +35,7 @@ trait AsyncClient {
 
 class ApacheHTTPAsyncClient(bodyDecoder: ResponseBodyDecoder = DefaultResponseBodyDecoder, val userAgent: String = AsyncClient.userAgent()) extends AsyncClient {
 
-  protected implicit val dispatcher = new SerialDispatchQueue(name = "AsyncClient")
+  protected implicit val dispatcher = new SerialDispatchQueue()
 
   private val client = HttpClients.createDefault()
 

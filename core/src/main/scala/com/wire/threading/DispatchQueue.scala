@@ -26,11 +26,12 @@ import com.wire.macros.logging.LogTag
 
 import scala.annotation.tailrec
 import scala.concurrent.ExecutionContext
-import scala.util.Random
 
 trait DispatchQueue extends ExecutionContext {
 
-  private[threading] val name: String = "queue_" + Random.nextInt().toHexString
+  private[threading] val name: LogTag
+
+  protected def tag = name + s"_@${hashCode().toHexString}"
 
   /**
     * Executes a task on this queue.
@@ -40,19 +41,12 @@ trait DispatchQueue extends ExecutionContext {
   def apply[A](task: => A)(implicit tag: LogTag = ""): CancellableFuture[A] = CancellableFuture(task)(this, tag)
 
   //TODO: this implements ExecutionContext.reportFailure, should we use different log here? or maybe do something else
-  override def reportFailure(t: Throwable): Unit = error("reportFailure called", t)(name)
+  override def reportFailure(t: Throwable): Unit = error("reportFailure called", t)(tag)
 }
 
-object DispatchQueue {
-  def apply(concurrentTasks: Int = 0, executor: ExecutionContext = Threading.ThreadPool) = concurrentTasks match {
-    case 0 => new UnlimitedDispatchQueue(executor)
-    case 1 => new SerialDispatchQueue(executor)
-    case _ => new LimitedDispatchQueue(concurrentTasks, executor)
-  }
-}
-
-class UnlimitedDispatchQueue(executor: ExecutionContext = Threading.ThreadPool, override val name: String = "UnlimitedQueue") extends DispatchQueue {
-  override def execute(runnable: Runnable): Unit = executor.execute(DispatchQueueStats(name, runnable))
+class UnlimitedDispatchQueue(executor: ExecutionContext = Threading.ThreadPool)
+                            (implicit override val name: LogTag) extends DispatchQueue {
+  override def execute(runnable: Runnable): Unit = executor.execute(DispatchQueueStats(tag, runnable))
 }
 
 abstract class UiDispatchQueue() extends DispatchQueue {
@@ -63,7 +57,8 @@ abstract class UiDispatchQueue() extends DispatchQueue {
   * Execution context limiting number of concurrently executing tasks.
   * All tasks are executed on parent execution context.
   */
-class LimitedDispatchQueue(concurrencyLimit: Int = 1, parent: ExecutionContext = Threading.ThreadPool, override val name: String = "LimitedQueue") extends DispatchQueue {
+class LimitedDispatchQueue(concurrencyLimit: Int = 1, parent: ExecutionContext = Threading.ThreadPool)
+                          (implicit override val name: LogTag) extends DispatchQueue {
   require(concurrencyLimit > 0, "concurrencyLimit should be greater than 0")
 
   override def execute(runnable: Runnable): Unit = Executor.dispatch(runnable)
@@ -76,7 +71,7 @@ class LimitedDispatchQueue(concurrencyLimit: Int = 1, parent: ExecutionContext =
     val runningCount = new AtomicInteger(0)
 
     def dispatch(runnable: Runnable): Unit = {
-      queue.add(DispatchQueueStats(name, runnable))
+      queue.add(DispatchQueueStats(tag, runnable))
       dispatchExecutor()
     }
 
@@ -119,4 +114,5 @@ object LimitedDispatchQueue {
 }
 
 
-class SerialDispatchQueue(executor: ExecutionContext = Threading.ThreadPool, override val name: String = "serial_" + Random.nextInt().toHexString) extends LimitedDispatchQueue(1, executor)
+class SerialDispatchQueue(executor: ExecutionContext = Threading.ThreadPool)
+                         (implicit override val name: LogTag) extends LimitedDispatchQueue(1, executor)

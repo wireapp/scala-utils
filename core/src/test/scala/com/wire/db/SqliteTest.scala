@@ -6,6 +6,7 @@ import java.sql.DriverManager
 import com.wire.assets.{AssetData, DefaultAssetStorage}
 import com.wire.data.{AssetId, JsonDecoder, JsonEncoder}
 import com.wire.testutils.FullFeatureSpec
+import com.wire.threading.DispatchQueueStats
 
 import scala.concurrent.Await
 

@@ -29,7 +29,7 @@ class DefaultZNetClientTest extends FullFeatureSpec {
       override val password = None//Some("aqa123456")
     }
 
-    private implicit val dispatcher = new SerialDispatchQueue(name = "DatabaseQueue")
+    private implicit val dispatcher = new SerialDispatchQueue()("DatabaseQueue")
 
     override val accessToken = Preference[Option[Token]](None, MemMockStorage.getToken, MemMockStorage.setToken)
     override val cookie      = Preference[Option[String]](None, MemMockStorage.getCookie, MemMockStorage.setCookie)
@@ -98,7 +98,7 @@ class DefaultZNetClientTest extends FullFeatureSpec {
         CancellableFuture {
           Thread.sleep(500)
           response
-        }(new SerialDispatchQueue(name = "TestAsyncClient"))
+        }(new SerialDispatchQueue()("TestAsyncClient"))
       }
 
     val client = new DefaultZNetClient(credentials, mockAsync, config, new DefaultLoginClient(mockAsync, config))
@@ -118,7 +118,7 @@ class DefaultZNetClientTest extends FullFeatureSpec {
   }
 
   object MemMockStorage {
-    private implicit val dispatcher = new SerialDispatchQueue(name = "StorageQueue")
+    private implicit val dispatcher = new SerialDispatchQueue()("StorageQueue")
 
     private var savedToken = Option(Token("oldToken", "Bearer", Instant.now + 10.seconds))
     private var savedCookie = Option("oldCookie")
@@ -138,7 +138,7 @@ class DefaultZNetClientTest extends FullFeatureSpec {
 
   object FileMockStorage {
 
-    private implicit val dispatcher = new SerialDispatchQueue(name = "StorageQueue")
+    private implicit val dispatcher = new SerialDispatchQueue()("StorageQueue")
 
     private val storageLoc = "resources/user.txt"
 

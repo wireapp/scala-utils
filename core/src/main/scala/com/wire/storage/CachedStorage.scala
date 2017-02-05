@@ -105,7 +105,7 @@ trait CachedStorage[K, V] {
   */
 abstract class LRUCacheStorage[K, V](cacheSize: Int, dao: Dao[V, K], db: Database)(implicit tag: LogTag) extends CachedStorage[K, V] {
 
-  private implicit val dispatcher = new SerialDispatchQueue(name = s"$tag-Dispatcher")
+  private implicit val dispatcher = new SerialDispatchQueue()
 
   override val onAdded   = EventStream[Seq[V]]()
   override val onUpdated = EventStream[Seq[(V, V)]]()

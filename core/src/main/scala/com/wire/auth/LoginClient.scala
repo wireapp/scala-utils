@@ -34,7 +34,7 @@ trait LoginClient {
 class DefaultLoginClient(client: AsyncClient, backend: BackendConfig) extends LoginClient {
   import LoginClient._
 
-  private implicit val dispatcher = new SerialDispatchQueue(name = "LoginClient")
+  private implicit val dispatcher = new SerialDispatchQueue
 
   private var lastRequestTime = 0L
   private var failedAttempts = 0

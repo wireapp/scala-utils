@@ -16,12 +16,13 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
-  package com.wire.storage
+package com.wire.storage
 
 import com.wire.data.{Id, IdGen}
 import com.wire.reactive.{Signal, SourceSignal}
 import com.wire.threading.{SerialDispatchQueue, Threading}
 import org.threeten.bp.Instant
+import com.wire.logging.ZLog.ImplicitTag._
 
 import scala.concurrent.Future
 

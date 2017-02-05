@@ -16,44 +16,53 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
-   package com.wire.threading
+package com.wire.threading
+
+import org.threeten.bp.Instant
 
 import scala.collection.mutable
 import scala.concurrent.ExecutionContext
+import com.wire.utils.RichInstant
+import org.threeten.bp.Instant.now
 
 object DispatchQueueStats {
 
-  var Debug = true //to be set by application
+  val Verbose = 2
+  val Debug = 1
+  val Off = 0
+
+  var LogLevel = Off //to be set by application
 
   val stats = new mutable.HashMap[String, QueueStats]
 
   def apply(queue: String, executor: ExecutionContext): ExecutionContext =
-    if (Debug) {
+    if (LogLevel >= Debug) {
       new ExecutionContext {
         override def reportFailure(cause: Throwable): Unit = executor.reportFailure(cause)
         override def execute(runnable: Runnable): Unit = executor.execute(DispatchQueueStats(queue, runnable))
       }
     } else executor
 
-  def apply(queue: String, task: Runnable): Runnable = if (Debug) { new StatsRunnable(task, queue) } else task
+  def apply(queue: String, task: Runnable): Runnable = if (LogLevel >= Debug) { new StatsRunnable(task, queue) } else task
 
   def debug[A](queue: String)(f: => A): A = {
-    val start = System.nanoTime()
+    val start = now
     val res = f
-    add(queue, start, start, System.nanoTime())
+    add(queue, start, start, now)
     res
   }
 
   def reset() = synchronized { stats.clear() }
 
-  def add(queue: String, init: Long, start: Long, done: Long) = DispatchQueueStats.synchronized {
+  def add(queue: String, init: Instant, start: Instant, done: Instant) = DispatchQueueStats.synchronized {
     stats.getOrElseUpdate(queue, QueueStats(queue)).add(init, start, done)
   }
 
   def printStats(minTasks: Int = 10) = report(minTasks) foreach println
 
-  def report(minTasks: Int = 10) =
+  def report(minTasks: Int = 10) = {
     stats.values.toSeq.sortBy(_.totalExecution).reverse.filter(s => s.count > 10 || s.total > 1000000).map(_.report)
+  }
 
   case class QueueStats(queue: String) {
 
@@ -62,28 +71,34 @@ object DispatchQueueStats {
     var totalWait = 0L
     var totalExecution = 0L
 
-    def add(initNanos: Long, startNanos: Long, doneNanos: Long): Unit = {
+    def add(init: Instant, start: Instant, done: Instant): Unit = {
       count += 1
-      total += (doneNanos - initNanos) / 1000
-      totalWait += (startNanos - initNanos) / 1000
-      totalExecution += (doneNanos - startNanos) / 1000
+      total += init.until(done).toMicros
+      totalWait += init.until(start).toMicros
+      totalExecution += start.until(done).toMicros
     }
 
     def report = QueueReport(queue, count, total, totalWait, totalExecution)
   }
 
   class StatsRunnable(task: Runnable, queue: String) extends Runnable {
-    val init: Long = System.nanoTime()
+    val init = now
+    if (LogLevel >= Verbose) println(f"${"Added new task:"}%-15s ${hash(task)}%-10s on $queue%-40s at $init")
 
     override def run(): Unit = {
-      val start = System.nanoTime()
+      val start = now
+      if (LogLevel >= Verbose) println(f"${"Started task:"}%-15s ${hash(task)}%-10s on $queue%-40s at $start (waited ${init.until(start).toMillis}ms)")
       try {
         task.run()
       } finally {
-        DispatchQueueStats.add(queue, init, start, System.nanoTime())
+        val finished = now
+        if (LogLevel >= Verbose) println(f"${"Finished task:"}%-15s ${hash(task)}%-10s on $queue%-40s at $finished (took ${start.until(finished).toMillis}ms)")
+        DispatchQueueStats.add(queue, init, start, finished)
       }
     }
   }
+
+  private def hash(obj: Object) = s"@${Integer.toHexString(obj.hashCode())}"
 }
 
 case class QueueReport(queue: String, count: Int, total: Long, totalWait: Long, totalExecution: Long) {

@@ -27,7 +27,7 @@ class ZNetClientSpec extends FullFeatureSpec {
       override val password = None
     }
 
-    private implicit val dispatcher = new SerialDispatchQueue(name = "DatabaseQueue")
+    private implicit val dispatcher = new SerialDispatchQueue()("DatabaseQueue")
 
     override val accessToken = Preference[Option[Token]](None, Future(Some(Token("Token", "Bearer", Instant.now))), _ => Future.successful())
     override val cookie      = Preference[Option[String]](None, Future(Some("Cookie")), _ => Future.successful())

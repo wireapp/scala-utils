@@ -21,6 +21,7 @@
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.{ConcurrentLinkedQueue, CountDownLatch, CyclicBarrier}
 
+import com.wire.macros.logging.LogTag
 import com.wire.testutils.{RichLatch, TestInt}
 import com.wire.testutils.FullFeatureSpec
 import com.wire.threading.{SerialDispatchQueue, Threading}
@@ -34,6 +35,7 @@ class SignalSpec extends FullFeatureSpec {
   import scala.concurrent.ExecutionContext.Implicits.global
 
   implicit val ec: EventContext = EventContext.Global
+  implicit val logtag: LogTag = "SignalTestQueue"
 
   var received = Seq[Int]()
   val capture = (value: Int) => received = received :+ value
