@@ -29,11 +29,11 @@ import scala.collection.breakOut
 import scala.language.implicitConversions
 
 trait Reader[A] {
-  def apply(implicit c: ResultSet): A
+  def apply(implicit c: Cursor): A
 }
 
 object Reader {
-  def apply[A](f: ResultSet => A): Reader[A] = new Reader[A] { def apply(implicit c: ResultSet): A = f(c) }
+  def apply[A](f: Cursor => A): Reader[A] = new Reader[A] { def apply(implicit c: Cursor): A = f(c) }
 }
 
 abstract class Dao[T, A] extends DaoIdOps[T] {
@@ -90,7 +90,7 @@ abstract class DaoIdOps[T] extends BaseDao[T] {
 
   def getCursor(id: IdVals)(implicit db: Database) = findById(id)
 
-  private def findById(id: IdVals)(implicit db: Database): ResultSet = db.query(table.name, null, builtIdCols, idValueSplitter(id), null, null, null, "1")
+  private def findById(id: IdVals)(implicit db: Database): Cursor = db.query(table.name, null, builtIdCols, idValueSplitter(id), null, null, null, "1")
 
   def delete(id: IdVals)(implicit db: Database): Int = db.delete(table.name, builtIdCols, idValueSplitter(id))
 
@@ -118,27 +118,27 @@ abstract class BaseDao[T] extends Reader[T] {
 
   def values(item: T): ContentValues = table.save(item)
 
-  def listCursor(implicit db: Database): ResultSet = db.query(table.name)
+  def listCursor(implicit db: Database): Cursor = db.query(table.name)
 
   def list(implicit db: Database): Vector[T] = list(listCursor)
 
-  def iterating(c: => ResultSet): Managed[Iterator[T]] = Database.iteratingWithReader(this)(c)
+  def iterating(c: => Cursor): Managed[Iterator[T]] = Database.iteratingWithReader(this)(c)
 
-  def single(c: ResultSet, close: Boolean = true): Option[T] = try { if (c.first()) Option(apply(c)) else None } finally { if (close) c.close() }
+  def single(c: Cursor, close: Boolean = true): Option[T] = try { if (c.moveToFirst()) Option(apply(c)) else None } finally { if (close) c.close() }
 
-  def list(c: ResultSet, close: Boolean = true, filter: T => Boolean = { _ => true }): Vector[T] = try { ResultSetIterator(c)(this).filter(filter).toVector } finally { if (close) c.close() }
+  def list(c: Cursor, close: Boolean = true, filter: T => Boolean = { _ => true }): Vector[T] = try { CursorIterator(c)(this).filter(filter).toVector } finally { if (close) c.close() }
 
-  def foreach(c: ResultSet, f: T => Unit): Unit =
-    try { ResultSetIterator(c)(this).foreach(f) } finally { c.close() }
+  def foreach(c: Cursor, f: T => Unit): Unit =
+    try { CursorIterator(c)(this).foreach(f) } finally { c.close() }
 
   def foreach(f: T => Unit)(implicit db: Database): Unit = {
     val c = listCursor
-    try { ResultSetIterator(c)(this).foreach(f) } finally { c.close() }
+    try { CursorIterator(c)(this).foreach(f) } finally { c.close() }
   }
 
-  def find[A](col: Column[A], value: A)(implicit db: Database): ResultSet = db.query(table.name, selection = s"${col.name} = ?", selectionArgs = Seq(col(value)))
+  def find[A](col: Column[A], value: A)(implicit db: Database): Cursor = db.query(table.name, selection = s"${col.name} = ?", selectionArgs = Seq(col(value)))
 
-  def findInSet[A](col: Column[A], values: Set[A])(implicit db: Database): ResultSet = db.query(table.name, null, s"${col.name} IN (${values.iterator.map(_ => "?").mkString(", ")})", values.map(col(_))(breakOut): Array[String], null, null, null)
+  def findInSet[A](col: Column[A], values: Set[A])(implicit db: Database): Cursor = db.query(table.name, null, s"${col.name} IN (${values.iterator.map(_ => "?").mkString(", ")})", values.map(col(_))(breakOut): Array[String], null, null, null)
 
   def delete[A](col: Column[A], value: A)(implicit db: Database): Int = db.delete(table.name, s"${col.name} = ?", Array(col(value)))
 
@@ -165,16 +165,16 @@ abstract class BaseDao[T] extends Reader[T] {
 
   type Column[A] = ColBinder[A, T]
 
-  final implicit def columnToValue[A](col: Column[A])(implicit results: ResultSet): A = {
-    val index = results.findColumn(col.name)
+  final implicit def columnToValue[A](col: Column[A])(implicit cursor: Cursor): A = {
+    val index = cursor.getColumnIndex(col.name)
     if (index < 0) {
       error(s"findColumn returned $index for column: ${col.name}")
     }
-    col.load(results, index)
+    col.load(cursor, index)
   }
 
   def readerFor[A](col: Column[A]): Reader[A] = new Reader[A] {
-    def apply(implicit c: ResultSet): A = col
+    def apply(implicit c: Cursor): A = col
   }
 
   final implicit class colToColumn[A](col: Col[A]) {

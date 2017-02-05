@@ -24,13 +24,13 @@ import com.wire.data.{Id, IdGen}
 import scala.language.higherKinds
 
 abstract class DbTranslator[T] {
-  def load(cursor: ResultSet, index: Int): T
+  def load(cursor: Cursor, index: Int): T
   def literal(value: T): String
 }
 
 object DbTranslator {
   implicit object StringTranslator extends DbTranslator[String] {
-    override def load(result: ResultSet, index: Int): String = result.getString(index)
+    override def load(result: Cursor, index: Int): String = result.getString(index)
     override def literal(value: String) = value
   }
 //  implicit object UidTranslator extends DbTranslator[Uid] {
@@ -125,7 +125,7 @@ object DbTranslator {
 //    override def literal(value: File): String = value.getCanonicalPath
 //  }
   implicit def idTranslator[A <: Id: IdGen](): DbTranslator[A] = new DbTranslator[A] {
-    override def load(cursor: ResultSet, index: Int): A = implicitly[IdGen[A]].decode(cursor.getString(index))
+    override def load(cursor: Cursor, index: Int): A = implicitly[IdGen[A]].decode(cursor.getString(index))
     override def literal(value: A): String = implicitly[IdGen[A]].encode(value)
   }
 //  implicit def jsonTranslator[A: JsonDecoder : JsonEncoder](): DbTranslator[A] = new DbTranslator[A] {

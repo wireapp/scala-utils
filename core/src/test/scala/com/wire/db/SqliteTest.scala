@@ -1,42 +1,68 @@
 package com.wire.db
 
 import java.io.File
-import java.sql.{DriverManager, ResultSet}
 
 import com.wire.assets.AssetData
-import com.wire.data.{AssetId, JsonDecoder, JsonEncoder, Managed}
-import com.wire.macros.returning
+import com.wire.data.{AssetId, JsonDecoder, JsonEncoder}
 import com.wire.testutils.FullFeatureSpec
-import com.wire.threading.SerialDispatchQueue
 
 class SqliteTest extends FullFeatureSpec {
 
-  scenario("Figure out this JDBC stuff") {
+  lazy val db: Database = new SQLiteDatabase(new File("core/src/test/resources/database.db"))
 
-
-    val dbFile = new File("core/src/test/resources/database.db")
-    new File(dbFile.getParent).mkdir()
-    dbFile.createNewFile()
-
-
-    val connection = Managed(DriverManager.getConnection(s"jdbc:sqlite:${dbFile.getAbsolutePath}"))
-
-    connection.foreach { c =>
-      val rs = returning(c.createStatement()) { st =>
-        st.setQueryTimeout(30)
-        st.executeUpdate("drop table if exists person")
-        st.executeUpdate("create table person (id integer, name string)")
-        st.executeUpdate("insert into person values(1, 'leo')")
-        st.executeUpdate("insert into person values(2, 'yui')")
-        st.executeUpdate("insert into person values(3, 'woop')")
-      }.executeQuery("select * from person")
-
-      while (rs.next()) {
-        println(s"name: ${rs.getString("name")}")
-        println(s"id: ${rs.getInt("id")}")
-      }
-    }
+  private def resetTable() = {
+    db.execSQL(
+      """
+        |drop table if exists person;
+        |create table person (id integer, name string);
+        |insert into person values(1, 'leo');
+        |insert into person values(2, 'yui');
+      """.stripMargin
+    )
   }
+
+  scenario("query all") {
+    resetTable()
+    val cur = db.query("person")
+
+    Seq((1, "leo"), (2, "yui")).foreach { case (id, name) =>
+      cur.moveToNext()
+      cur.getString("name") shouldEqual name
+      cur.getInt("id") shouldEqual id
+    }
+    cur.moveToNext() shouldEqual false
+    cur.close()
+  }
+
+  scenario("query selection") {
+    resetTable()
+    val cur = db.query("person", Set("name"), "name = ?", Seq("leo"))
+
+    cur.moveToNext()
+    cur.getString("name") shouldEqual "leo"
+    cur.moveToNext() shouldEqual false
+    cur.close()
+  }
+
+  scenario("query all columns with selection") {
+    val cur = db.query("person", selection = "name = ? OR name = ?", selectionArgs = Seq("leo"))
+
+    cur.moveToNext()
+    cur.getString("name") shouldEqual "leo"
+    cur.getInt("id") shouldEqual 1
+
+    cur.moveToNext() shouldEqual false
+    cur.close()
+  }
+
+  scenario("Multiple queries") {
+    val cur = db.query("person")
+    cur.close()
+
+    val cur2 = db.query("person")
+    cur2.close()
+  }
+
 
   scenario("Be one with the Dao") {
 
@@ -48,22 +74,10 @@ class SqliteTest extends FullFeatureSpec {
       override val idCol = Id
       override val table = Table("Assets", Id, Data)
 
-      override def apply(implicit cursor: ResultSet): AssetData = JsonDecoder.decode(Data)(AssetData.AssetDataDecoder)
+      override def apply(implicit cursor: Cursor): AssetData = JsonDecoder.decode(Data)(AssetData.AssetDataDecoder)
     }
 
-    implicit val db = new Database {
-      override implicit val dispatcher = new SerialDispatchQueue(name = "Test Database")
-      override def setTransactionSuccessful() = ???
-      override def endTransaction() = ???
-      override def beginTransactionNonExclusive() = ???
-      override def isInTransaction = ???
-      override def close() = ???
-      override def execSQL(createSql: String) = ???
-      override def query(tableName: String, columns: Set[String], selection: String, selectionArgs: Seq[String], groupBy: String, having: String, orderBy: String, limit: String) = ???
-      override def delete(tableName: String, whereClaus: String, whereArgs: Seq[String]) = ???
-    }
-
-    AssetDataDao.list
+    //    AssetDataDao.onCreate(db)
 
   }
 

@@ -18,42 +18,16 @@
  */
 package com.wire.db
 
-import java.sql.ResultSet
+import java.io.File
+import java.sql.{DriverManager, ResultSet, Statement}
 
 import com.wire.data.Managed
-import com.wire.macros.logging.LogTag
-import com.wire.macros.returning
-import com.wire.threading._
-
-import scala.concurrent.Future
+import com.wire.logging.ZLog.ImplicitTag._
+import com.wire.logging.ZLog.verbose
 
 trait Database {
 
   import Database._
-
-  implicit val dispatcher: SerialDispatchQueue
-
-  lazy val readExecutionContext: DispatchQueue = new UnlimitedDispatchQueue(Threading.IO, name = "Database_readQueue_" + hashCode().toHexString)
-
-  def apply[A](f: => A)(implicit logTag: LogTag = ""): CancellableFuture[A] = dispatcher {
-    inTransaction(f)
-  } ("Database_" + logTag)
-
-  def withTransaction[A](f: => A)(implicit logTag: LogTag = ""): CancellableFuture[A] = apply(f)
-
-  def read[A](f: => A): Future[A] = Future {
-    inReadTransaction(f)
-  } (readExecutionContext)
-
-  def setTransactionSuccessful(): Unit
-
-  def endTransaction(): Unit
-
-  def beginTransactionNonExclusive(): Unit
-
-  def isInTransaction: Boolean
-
-  def close(): Unit
 
   def execSQL(createSql: String): Unit
 
@@ -65,36 +39,78 @@ trait Database {
             having:        String      = "",
             orderBy:       String      = "",
             limit:         String      = ""
-           ): ResultSet
+           ): Cursor
 
   def delete(tableName: String, whereClaus: String, whereArgs: Seq[String]): Int
 
   def insertWithOnConflict(tableName: String, nullColumnHack: String, initialValues: ContentValues, conflictAlgorithm: Int) = Long
+}
 
-  def inTransaction[A](body: => A): A = inTransaction(_ => body)
+/**
+  * Allows keeping connection open while ResultSet is being used outside of Database class, and also
+  * provides a nice way to wrap the android methods, making copying easier
+  */
+case class Cursor(st: Statement, resultSet: ResultSet) extends AutoCloseable {
 
-  def inTransaction[A](body: Transaction => A): A = {
-    val tr = new Transaction(this)
-    if (isInTransaction) body(tr)
-    else {
-      beginTransactionNonExclusive()
-      try returning(body(tr)) { _ => setTransactionSuccessful() }
-      finally endTransaction()
-    }
+  def close() = {
+    st.close()
+    st.getConnection.close()
   }
 
-  def inReadTransaction[A](body: => A): A =
-    if (isInTransaction) body
-    else {
-      beginTransactionNonExclusive()
-      try returning(body) { _ => setTransactionSuccessful() }
-      finally endTransaction()
+  def moveToFirst() = resultSet.first()
+
+  def moveToNext() = resultSet.next()
+
+  def isClosed = resultSet.isClosed
+
+  def isAfterLast = resultSet.isAfterLast
+
+  def getColumnIndex(columnName: String) = resultSet.findColumn(columnName)
+
+  def count: Int = -1
+
+  def getString(colIndex: Int): String = resultSet.getString(colIndex)
+  def getString(colLabel: String): String = resultSet.getString(colLabel)
+
+  def getInt(colIndex: Int): Int = resultSet.getInt(colIndex)
+  def getInt(colLabel: String): Int = resultSet.getInt(colLabel)
+}
+
+class SQLiteDatabase(dbFile: File) extends Database {
+
+  new File(dbFile.getParent).mkdirs()
+  dbFile.createNewFile()
+
+  override def execSQL(sql: String) = Managed(connection).acquire(_.createStatement().executeUpdate(sql))
+
+  override def query(tableName: String, columns: Set[String], selection: String, selectionArgs: Seq[String],
+                     groupBy: String, having: String, orderBy: String, limit: String) = {
+
+    val cols = if (columns.isEmpty) "*" else columns.mkString(", ")
+    val sel = if (selection.isEmpty) "" else s" WHERE $selection"
+    val query = s"SELECT $cols FROM $tableName$sel"
+
+    verbose(s"Querying database: $query")
+
+    val st = connection.prepareStatement(query)
+    selectionArgs.zipWithIndex.foreach { case (arg, i) =>
+      st.setString(i + 1, arg)
     }
+
+    Cursor(st, st.executeQuery())
+  }
+
+  override def delete(tableName: String, whereClaus: String, whereArgs: Seq[String]) = ???
+
+  private def connection = {
+    verbose(s"Creating db connection to ${dbFile.getAbsolutePath}")
+    DriverManager.getConnection(s"jdbc:sqlite:${dbFile.getAbsolutePath}")
+  }
 }
 
 object Database {
 
-  def iteratingWithReader[A](reader: Reader[A])(c: => ResultSet): Managed[Iterator[A]] = Managed(c).map(new ResultSetIterator[A](_)(reader))
+  def iteratingWithReader[A](reader: Reader[A])(c: => Cursor): Managed[Iterator[A]] = Managed(c).map(new CursorIterator[A](_)(reader))
 
   val ConflictRollback = 1
   val ConflictAbort = 2
@@ -103,12 +119,4 @@ object Database {
   val ConflictReplace = 5
 
   type ContentValues = Map[String, String]
-
-  class Transaction(db: Database) {
-    def flush() = {
-      db.setTransactionSuccessful()
-      db.endTransaction()
-      db.beginTransactionNonExclusive()
-    }
-  }
 }

@@ -29,7 +29,7 @@ object ZLog {
 
   def setZLog(zLog: ZLog) = Option(this.zLog) match {
     case None    => this.zLog = zLog
-    case Some(_) => throw new IllegalStateException("Logging already defined for application")
+    case Some(_) => warn("Logging already defined for application, will not change")(ImplicitTag.implicitLogTag)
   }
 
   private def withLogging(f: ZLog => Unit) = Option(zLog) match {

@@ -29,7 +29,7 @@ import org.scalatest._
   * needs to be done just once should go in the beforeAll method.
   */
 abstract class FullFeatureSpec extends FeatureSpec with scalatest.Matchers with OptionValues with BeforeAndAfter
-                                       with BeforeAndAfterAll with OneInstancePerTest with MockFactory with Inside {
+                                       with OneInstancePerTest with MockFactory with Inside with BeforeAndAfterAll  {
 
   override def beforeAll {
     Threading.setUiDispatchQueue(new UiDispatchQueue {

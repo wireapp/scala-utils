@@ -25,7 +25,7 @@ import scala.collection.mutable
 import scala.language.higherKinds
 
 case class Col[A](name: String, sqlType: String, modifiers: String = "")(implicit translator: DbTranslator[A]) {
-  def load(result: ResultSet, index: Int): A = translator.load(result, index)
+  def load(cursor: Cursor, index: Int): A = translator.load(cursor, index)
   def save(value: A, values: mutable.Map[String, String]): Unit = values.put(name, translator.literal(value))
   def sqlLiteral(value: A): String = translator.literal(value)
 }
@@ -117,7 +117,7 @@ object Col {
 
 case class ColBinder[A, B](col: Col[A], extractor: B => A, var index: Int = 0) {
   def apply(value: A): String = col.sqlLiteral(value)
-  def load(cursor: ResultSet, index: Int): A = col.load(cursor, index)
+  def load(cursor: Cursor, index: Int): A = col.load(cursor, index)
   def save(value: B, values: mutable.Map[String, String]): Unit = col.save(extractor(value), values)
   def name: String = col.name
 }
