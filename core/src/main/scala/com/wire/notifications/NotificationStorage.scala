@@ -35,21 +35,21 @@ trait NotificationStorage extends CachedStorage[NotifId, NotificationData] {
     onDeleted.map(_.map(Removed(_)))
   )
 
-  // signal with all data
-  val notifications = new AggregatingSignal[Seq[ContentChange[NotifId, NotificationData]], Map[NotifId, NotificationData]](changesStream, list().map(_.map { n => n.id -> n }(breakOut)), { (values, changes) =>
-    val added = new mutable.HashMap[NotifId, NotificationData]
-    val removed = new mutable.HashSet[NotifId]
-    changes foreach {
-      case Added(id, data) =>
-        removed -= id
-        added += id -> data
-      case Updated(id, _, data) =>
-        removed -= id
-        added += id -> data
-      case Removed(id) =>
-        removed += id
-        added -= id
-    }
-    values -- removed ++ added
-  })
+//  // signal with all data
+//  val notifications = new AggregatingSignal[Seq[ContentChange[NotifId, NotificationData]], Map[NotifId, NotificationData]](changesStream, list().map(_.map { n => n.id -> n }(breakOut)), { (values, changes) =>
+//    val added = new mutable.HashMap[NotifId, NotificationData]
+//    val removed = new mutable.HashSet[NotifId]
+//    changes foreach {
+//      case Added(id, data) =>
+//        removed -= id
+//        added += id -> data
+//      case Updated(id, _, data) =>
+//        removed -= id
+//        added += id -> data
+//      case Removed(id) =>
+//        removed += id
+//        added -= id
+//    }
+//    values -- removed ++ added
+//  })
 }

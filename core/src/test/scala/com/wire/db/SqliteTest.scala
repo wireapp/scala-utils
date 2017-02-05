@@ -1,10 +1,13 @@
 package com.wire.db
 
 import java.io.File
+import java.sql.DriverManager
 
-import com.wire.assets.AssetData
+import com.wire.assets.{AssetData, DefaultAssetStorage}
 import com.wire.data.{AssetId, JsonDecoder, JsonEncoder}
 import com.wire.testutils.FullFeatureSpec
+
+import scala.concurrent.Await
 
 class SqliteTest extends FullFeatureSpec {
 
@@ -63,22 +66,25 @@ class SqliteTest extends FullFeatureSpec {
     cur2.close()
   }
 
+  scenario("What happens with two connections?") {
 
-  scenario("Be one with the Dao") {
-
-    implicit object AssetDataDao extends Dao[AssetData, AssetId] {
-      import Col._
-      val Id    = id[AssetId]('_id, "PRIMARY KEY").apply(_.id)
-      val Data = text('data)(JsonEncoder.encodeString(_))
-
-      override val idCol = Id
-      override val table = Table("Assets", Id, Data)
-
-      override def apply(implicit cursor: Cursor): AssetData = JsonDecoder.decode(Data)(AssetData.AssetDataDecoder)
-    }
-
-    //    AssetDataDao.onCreate(db)
+    val c1 = DriverManager.getConnection(s"jdbc:sqlite:core/src/test/resources/database.db")
+    val c2 = DriverManager.getConnection(s"jdbc:sqlite:core/src/test/resources/database.db")
 
   }
+
+
+  scenario("Add some stuff to cached storage") {
+
+
+    val storage = new DefaultAssetStorage(db)
+
+    storage.insert(AssetData())
+    storage.insert(AssetData())
+
+    Thread.sleep(2000)
+  }
+
+
 
 }

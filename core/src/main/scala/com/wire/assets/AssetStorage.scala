@@ -16,12 +16,21 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
-  package com.wire.assets
+package com.wire.assets
 
+import com.wire.assets.AssetData.AssetDataDao
 import com.wire.data.AssetId
+import com.wire.db.Database
+import com.wire.storage.LRUCacheStorage
+import com.wire.logging.ZLog.ImplicitTag._
 
 import scala.concurrent.Future
 
 trait AssetStorage {
   def getAsset(id: AssetId): Future[Option[AssetData]]
+}
+
+class DefaultAssetStorage(db: Database) extends LRUCacheStorage[AssetId, AssetData](100, AssetDataDao, db) with AssetStorage {
+  override def getAsset(id: AssetId) = ???
+
 }

@@ -16,7 +16,7 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
-  package com.wire.assets
+package com.wire.assets
 
 import com.wire.assets.AssetClient.{Retention, UploadResponse}
 import com.wire.cache.LocalData

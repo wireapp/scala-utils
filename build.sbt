@@ -43,6 +43,8 @@ lazy val core = (project in file("core"))
 
       "com.twitter" %% "util-cache" % "6.39.0",
 
+      "org.apache.commons" % "commons-collections4" % "4.1",
+
       "org.xerial" % "sqlite-jdbc" % "3.15.1",
 
       //test dependencies

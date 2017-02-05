@@ -1,5 +1,7 @@
 package com.wire.db
 
+import java.sql.PreparedStatement
+
 import com.wire.db.Database.ContentValues
 
 import scala.collection.mutable
@@ -23,7 +25,7 @@ class Table[A](val name: String, val columns: ColBinder[_, A]*) {
     values.toMap
   }
 
-//  def bind(obj: A, stmt: SQLiteProgram) = columns.foreach(_.bind(obj, stmt))
+  def bind(obj: A, stmt: PreparedStatement) = columns.foreach(_.bind(obj, stmt))
 }
 
 class TableWithId[A](name: String, columns: ColBinder[_, A]*)(idCols: => Seq[ColBinder[_, A]]) extends Table[A](name, columns:_*) {

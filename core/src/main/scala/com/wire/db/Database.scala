@@ -19,11 +19,16 @@
 package com.wire.db
 
 import java.io.File
-import java.sql.{DriverManager, ResultSet, Statement}
+import java.sql.{DriverManager, PreparedStatement}
 
 import com.wire.data.Managed
+import com.wire.db.Database.ContentValues
 import com.wire.logging.ZLog.ImplicitTag._
 import com.wire.logging.ZLog.verbose
+import com.wire.macros.returning
+import com.wire.threading.{SerialDispatchQueue, Threading}
+
+import scala.concurrent.Future
 
 trait Database {
 
@@ -43,40 +48,19 @@ trait Database {
 
   def delete(tableName: String, whereClaus: String, whereArgs: Seq[String]): Int
 
-  def insertWithOnConflict(tableName: String, nullColumnHack: String, initialValues: ContentValues, conflictAlgorithm: Int) = Long
-}
+  def insertWithOnConflict(tableName: String, nullColumnHack: String, initialValues: ContentValues, conflictAlgorithm: Int): Long
 
-/**
-  * Allows keeping connection open while ResultSet is being used outside of Database class, and also
-  * provides a nice way to wrap the android methods, making copying easier
-  */
-case class Cursor(st: Statement, resultSet: ResultSet) extends AutoCloseable {
+  def apply[A](f: SQLiteDatabase => A): Future[A]
 
-  def close() = {
-    st.close()
-    st.getConnection.close()
-  }
+  def read[A](f: SQLiteDatabase => A): Future[A]
 
-  def moveToFirst() = resultSet.first()
-
-  def moveToNext() = resultSet.next()
-
-  def isClosed = resultSet.isClosed
-
-  def isAfterLast = resultSet.isAfterLast
-
-  def getColumnIndex(columnName: String) = resultSet.findColumn(columnName)
-
-  def count: Int = -1
-
-  def getString(colIndex: Int): String = resultSet.getString(colIndex)
-  def getString(colLabel: String): String = resultSet.getString(colLabel)
-
-  def getInt(colIndex: Int): Int = resultSet.getInt(colIndex)
-  def getInt(colLabel: String): Int = resultSet.getInt(colLabel)
+  def withStatement[A](sql: String)(body: PreparedStatement => A): A
 }
 
 class SQLiteDatabase(dbFile: File) extends Database {
+
+  //TODO handle multiple threads/connections at some point
+  lazy val dispatcher = new SerialDispatchQueue(Threading.IO, name = "Database_queue" + hashCode().toHexString)
 
   new File(dbFile.getParent).mkdirs()
   dbFile.createNewFile()
@@ -88,24 +72,38 @@ class SQLiteDatabase(dbFile: File) extends Database {
 
     val cols = if (columns.isEmpty) "*" else columns.mkString(", ")
     val sel = if (selection.isEmpty) "" else s" WHERE $selection"
-    val query = s"SELECT $cols FROM $tableName$sel"
+    val lim = if(limit.isEmpty) "" else s" LIMIT $limit"
+    val query = s"SELECT $cols FROM $tableName$sel$lim"
 
     verbose(s"Querying database: $query")
 
-    val st = connection.prepareStatement(query)
+    val stmt = connection.prepareStatement(query)
     selectionArgs.zipWithIndex.foreach { case (arg, i) =>
-      st.setString(i + 1, arg)
+      stmt.setString(i + 1, arg)
     }
 
-    Cursor(st, st.executeQuery())
+    Cursor(stmt, stmt.executeQuery())
+  }
+
+  override def withStatement[A](sql: String)(body: PreparedStatement => A): A = {
+    Managed(connection).acquire { c =>
+      Managed(c.prepareStatement(sql)).acquire(body)
+    }
   }
 
   override def delete(tableName: String, whereClaus: String, whereArgs: Seq[String]) = ???
+
+  //TODO handle transactions
+  override def read[A](f: (SQLiteDatabase) => A): Future[A] = apply(f)
 
   private def connection = {
     verbose(s"Creating db connection to ${dbFile.getAbsolutePath}")
     DriverManager.getConnection(s"jdbc:sqlite:${dbFile.getAbsolutePath}")
   }
+
+  override def insertWithOnConflict(tableName: String, nullColumnHack: String, initialValues: ContentValues, conflictAlgorithm: Int) = -1L
+
+  override def apply[A](f: (SQLiteDatabase) => A) = dispatcher(f(this)).future
 }
 
 object Database {
@@ -119,4 +117,5 @@ object Database {
   val ConflictReplace = 5
 
   type ContentValues = Map[String, String]
+
 }

@@ -27,6 +27,7 @@ import com.wire.cache.CacheKey
 import com.wire.cryptography.{AESKey, Sha256}
 import com.wire.data.Dimensions.{H, W}
 import com.wire.data._
+import com.wire.db.{Cursor, Dao}
 import com.wire.logging.ZLog._
 import com.wire.logging.ZLog.ImplicitTag._
 import org.apache.commons.codec.binary.Base64
@@ -221,23 +222,18 @@ object AssetData {
 
   case class UploadTaskKey(id: AssetId)
 
-//  implicit object AssetDataDao extends Dao[AssetData, AssetId] {
-//    val Id    = id[AssetId]('_id, "PRIMARY KEY").apply(_.id)
-//    val Asset = text[AssetType]('asset_type, _.name, AssetType.valueOf)(_ => AssetType.Empty)
-//    val Data = text('data)(JsonEncoder.encodeString(_))
-//
-//    override val idCol = Id
-//    override val table = Table("Assets", Id, Asset, Data)
-//
-//    override def apply(implicit cursor: Cursor): AssetData = {
-//      val tpe: AssetType = Asset
-//      tpe match {
-//        case AssetType.Image => JsonDecoder.decode(Data)(ImageAssetDataDecoder)
-//        case AssetType.Any   => JsonDecoder.decode(Data)(AnyAssetDataDecoder)
-//        case _               => JsonDecoder.decode(Data)(AssetDataDecoder)
-//      }
-//    }
-//  }
+  implicit object AssetDataDao extends Dao[AssetData, AssetId] {
+
+    import com.wire.db.Col._
+
+    val Id    = id[AssetId]('_id, "PRIMARY KEY").apply(_.id)
+    val Data = text('data)(JsonEncoder.encodeString(_))
+
+    override val idCol = Id
+    override val table = Table("Assets", Id, Data)
+
+    override def apply(implicit cursor: Cursor): AssetData = JsonDecoder.decode(Data)(AssetDataDecoder)
+  }
 
   implicit lazy val AssetDataEncoder: JsonEncoder[AssetData] = new JsonEncoder[AssetData] {
     override def apply(data: AssetData): JSONObject = JsonEncoder { o =>

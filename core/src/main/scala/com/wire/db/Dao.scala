@@ -25,7 +25,7 @@ import com.wire.logging.ZLog._
 import com.wire.logging.ZLog.ImplicitTag._
 import com.wire.macros.returning
 
-import scala.collection.breakOut
+import scala.collection.{GenTraversableOnce, breakOut}
 import scala.language.implicitConversions
 
 trait Reader[A] {
@@ -142,18 +142,18 @@ abstract class BaseDao[T] extends Reader[T] {
 
   def delete[A](col: Column[A], value: A)(implicit db: Database): Int = db.delete(table.name, s"${col.name} = ?", Array(col(value)))
 
-//  def insertOrIgnore(items: GenTraversableOnce[T])(implicit db: Database): Unit = insertWith(table.insertOrIgnoreSql)(items)
-//
-//  def insertOrReplace(items: GenTraversableOnce[T])(implicit db: Database): Unit = insertWith(table.insertSql)(items)
-//
-//  private def insertWith(sql: String)(items: GenTraversableOnce[T])(implicit db: Database): Unit = inTransaction {
-//    withDatabase(sql) { stmt =>
-//      items foreach { item =>
-//        table.bind(item, stmt)
-//        stmt.execute()
-//      }
-//    }
-//  }
+  def insertOrIgnore(items: GenTraversableOnce[T])(implicit db: Database): Unit = insertWith(table.insertOrIgnoreSql)(items)
+
+  def insertOrReplace(items: GenTraversableOnce[T])(implicit db: Database): Unit = insertWith(table.insertSql)(items)
+
+  private def insertWith(sql: String)(items: GenTraversableOnce[T])(implicit db: Database): Unit = {
+    db.withStatement(sql) { stmt =>
+      items foreach { item =>
+        table.bind(item, stmt)
+        stmt.execute()
+      }
+    }
+  }
 
   def insertOrIgnore(item: T)(implicit db: Database): T = returning(item)(i => db.insertWithOnConflict(table.name, null, values(i), Database.ConflictIgnore))
 

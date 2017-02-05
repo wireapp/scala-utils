@@ -17,7 +17,7 @@
  */
 package com.wire.db
 
-import java.sql.ResultSet
+import java.sql.{PreparedStatement, ResultSet}
 
 import com.wire.data.{Id, IdGen}
 
@@ -26,7 +26,8 @@ import scala.language.higherKinds
 
 case class Col[A](name: String, sqlType: String, modifiers: String = "")(implicit translator: DbTranslator[A]) {
   def load(cursor: Cursor, index: Int): A = translator.load(cursor, index)
-  def save(value: A, values: mutable.Map[String, String]): Unit = values.put(name, translator.literal(value))
+  def save(value: A, values: mutable.Map[String, String]): Unit = values.put(name, sqlLiteral(value))
+  def bind(value: A, index: Int, stmt: PreparedStatement): Unit = stmt.setString(index, sqlLiteral(value))
   def sqlLiteral(value: A): String = translator.literal(value)
 }
 
@@ -118,6 +119,7 @@ object Col {
 case class ColBinder[A, B](col: Col[A], extractor: B => A, var index: Int = 0) {
   def apply(value: A): String = col.sqlLiteral(value)
   def load(cursor: Cursor, index: Int): A = col.load(cursor, index)
+  def bind(value: B, stmt: PreparedStatement): Unit = col.bind(extractor(value), index + 1, stmt)
   def save(value: B, values: mutable.Map[String, String]): Unit = col.save(extractor(value), values)
   def name: String = col.name
 }
