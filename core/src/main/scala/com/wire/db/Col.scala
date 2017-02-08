@@ -19,6 +19,7 @@ package com.wire.db
 
 import java.sql.{PreparedStatement, ResultSet}
 
+import com.wire.auth.{EmailAddress, Handle, PhoneNumber}
 import com.wire.data.{Id, IdGen}
 
 import scala.collection.mutable
@@ -26,24 +27,18 @@ import scala.language.higherKinds
 
 case class Col[A](name: String, sqlType: String, modifiers: String = "")(implicit translator: DbTranslator[A]) {
   def load(cursor: Cursor, index: Int): A = translator.load(cursor, index)
+  def loadOpt(cursor: Cursor, index: Int): Option[A] = translator.loadOpt(cursor, index)
   def save(value: A, values: mutable.Map[String, String]): Unit = values.put(name, sqlLiteral(value))
   def bind(value: A, index: Int, stmt: PreparedStatement): Unit = stmt.setString(index, sqlLiteral(value))
   def sqlLiteral(value: A): String = translator.literal(value)
 }
 
 object Col {
-//  def opt[A](c: Col[A]): Col[Option[A]] = Col[Option[A]](c.name, c.sqlType, c.modifiers)(new DbTranslator[Option[A]] {
-//    override def load(cursor: Cursor, index: Int): Option[A] = if (cursor.isNull(index)) None else Some(c.load(cursor, index))
-//    override def save(value: Option[A], name: String, values: ContentValues): Unit = value match {
-//      case Some(v) => c.save(v, values)
-//      case None => values.putNull(name)
-//    }
-//    override def bind(value: Option[A], index: Int, stmt: SQLiteProgram): Unit = value match {
-//      case Some(v) => c.bind(v, index, stmt)
-//      case None => stmt.bindNull(index)
-//    }
-//    override def literal(value: Option[A]): String = value.fold("NULL")(c.sqlLiteral)
-//  })
+  def opt[A](c: Col[A]): Col[Option[A]] = Col[Option[A]](c.name, c.sqlType, c.modifiers)(new DbTranslator[Option[A]] {
+    override def load(cursor: Cursor, index: Int) = c.loadOpt(cursor, index)
+    override def loadOpt(cursor: Cursor, index: Int) = Option(c.loadOpt(cursor, index))
+    override def literal(value: Option[A]) = value.fold("NULL")(c.sqlLiteral)
+  })
 //  def seq[A](name: Symbol, enc: Seq[A] => String, dec: String => Seq[A]): Col[Seq[A]] = Col[Seq[A]](name.name, "TEXT")(new DbTranslator[Seq[A]] {
 //    override def load(cursor: Cursor, index: Int): Seq[A] = if (cursor.isNull(index)) Nil else dec(cursor.getString(index))
 //    override def save(value: Seq[A], name: String, values: ContentValues): Unit = value match {
@@ -73,12 +68,10 @@ object Col {
 //
   def text(name: Symbol) = Col[String](name.name, "TEXT")
   def text(name: Symbol, modifiers: String) = Col[String](name.name, "TEXT", modifiers)
-//  def text[A](name: Symbol, enc: A => String, dec: String => A, modifiers: String = "") = Col[A](name.name, "TEXT")(new DbTranslator[A] {
-//    override def save(value: A, name: String, values: ContentValues): Unit = values.put(name, enc(value))
-//    override def bind(value: A, index: Int, stmt: SQLiteProgram): Unit = stmt.bindString(index, enc(value))
-//    override def load(cursor: Cursor, index: Int): A = dec(cursor.getString(index))
-//    override def literal(value: A): String = enc(value)
-//  })
+  def text[A](name: Symbol, enc: A => String, dec: String => A, modifiers: String = "") = Col[A](name.name, "TEXT")(new DbTranslator[A] {
+    override def loadOpt(cursor: Cursor, index: Int) = cursor.getString(index).map(dec)
+    override def literal(value: A) = enc(value)
+  })
   def id[A <: Id: IdGen](name: Symbol, modifiers: String = "") = Col[A](name.name, "TEXT", modifiers)(DbTranslator.idTranslator())
 //  def uid(name: Symbol, modifiers: String = "") = Col[Uid](name.name, "TEXT", modifiers)
 //  def int(name: Symbol, modifiers: String = "") = Col[Int](name.name, "INTEGER", modifiers)
@@ -94,9 +87,9 @@ object Col {
 //    override def load(cursor: Cursor, index: Int): A = dec(c.load(cursor, index))
 //    override def literal(value: A): String = c.sqlLiteral(enc(value))
 //  })
-//  def phoneNumber(name: Symbol, modifiers: String = "") = Col[PhoneNumber](name.name, "TEXT", modifiers)
-//  def emailAddress(name: Symbol, modifiers: String = "") = Col[EmailAddress](name.name, "TEXT", modifiers)
-//  def handle(name: Symbol, modifiers: String = "") = Col[Handle](name.name, "TEXT", modifiers)
+  def phoneNumber(name: Symbol, modifiers: String = "") = Col[PhoneNumber](name.name, "TEXT", modifiers)
+  def emailAddress(name: Symbol, modifiers: String = "") = Col[EmailAddress](name.name, "TEXT", modifiers)
+  def handle(name: Symbol, modifiers: String = "") = Col[Handle](name.name, "TEXT", modifiers)
 //  def date(name: Symbol, modifiers: String = "") = Col[Date](name.name, "INTEGER", modifiers)
 //  def finiteDuration(name: Symbol, modifiers: String = "") = Col[FiniteDuration](name.name, "INTEGER", modifiers)
 //  def timestamp(name: Symbol, modifiers: String = "") = Col[Instant](name.name, "INTEGER", modifiers)
@@ -110,7 +103,7 @@ object Col {
 //  def double(name: Symbol, modifiers: String = "") = Col[Double](name.name, "REAL", modifiers)
 //  def float(name: Symbol, modifiers: String = "") = Col[Float](name.name, "REAL", modifiers)
 //
-//  def bool(name: Symbol, modifiers: String = "") = Col[Boolean](name.name, "INTEGER", modifiers)
+  def bool(name: Symbol, modifiers: String = "") = Col[Boolean](name.name, "INTEGER", modifiers)
 //
 //  def file(name: Symbol, modifiers: String = "") = Col[File](name.name, "TEXT", modifiers)
 //  def blob(name: Symbol, modifiers: String = "") = Col[Array[Byte]](name.name, "BLOB", modifiers)

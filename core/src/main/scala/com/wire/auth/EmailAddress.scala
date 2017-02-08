@@ -63,6 +63,10 @@ object PhoneNumber extends (String => PhoneNumber) {
   implicit val Decoder: JsonDecoder[PhoneNumber] = JsonDecoder.lift(implicit js => PhoneNumber(JsonDecoder.decodeString('phone)))
 }
 
+case class ConfirmationCode(str: String) extends AnyVal {
+  override def toString: String = str
+}
+
 case class Handle(string: String) extends AnyVal{
   override def toString : String = string
   def containsQuery(query: String): Boolean = {

@@ -25,9 +25,15 @@ case class Cursor(st: Statement, resultSet: ResultSet) extends AutoCloseable {
 
   def count: Int = -1
 
-  def getString(colIndex: Int): String = resultSet.getString(colIndex)
-  def getString(colLabel: String): String = resultSet.getString(colLabel)
+  def getString(colIndex: Int): Option[String] = returnWithNullCheck(_.getString(colIndex))
+  def getString(colLabel: String): Option[String] = returnWithNullCheck(_.getString(colLabel))
 
-  def getInt(colIndex: Int): Int = resultSet.getInt(colIndex)
-  def getInt(colLabel: String): Int = resultSet.getInt(colLabel)
+  def getInt(colIndex: Int): Option[Int] = returnWithNullCheck(_.getInt(colIndex))
+  def getInt(colLabel: String): Option[Int] = returnWithNullCheck(_.getInt(colLabel))
+
+  private def returnWithNullCheck[A](value: ResultSet => A): Option[A] = {
+    val r = value(resultSet)
+    if (resultSet.wasNull()) None else Some(r)
+  }
+
 }

@@ -1,5 +1,6 @@
 package com.wire.auth
 
+import com.wire.auth.Credentials.EmailCredentials
 import com.wire.config.BackendConfig
 import com.wire.data.AccountId
 import com.wire.network.AccessTokenProvider.Token
@@ -53,10 +54,7 @@ class DefaultAuthenticationManagerTest extends FullFeatureSpec {
       }(new SerialDispatchQueue()("TestAsyncClient")))
 
     val authManager = new DefaultAuthenticationManager(new DefaultLoginClient(mockAsync, BackendConfig("https://www.someurl.com")), new CredentialsHandler {
-      override def credentials = new Credentials {
-        override val email = Some(EmailAddress("test@test.com"))
-        override val password = Some("password")
-      }
+      override def credentials = EmailCredentials(Some(EmailAddress("test@test.com")), Some("password"))
 
       private implicit val dispatcher = new SerialDispatchQueue()("DatabaseQueue")
 

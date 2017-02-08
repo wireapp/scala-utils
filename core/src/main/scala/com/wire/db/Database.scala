@@ -21,11 +21,11 @@ package com.wire.db
 import java.io.File
 import java.sql.{DriverManager, PreparedStatement}
 
+import com.wire.accounts.AccountData.AccountDataDao
 import com.wire.data.Managed
 import com.wire.db.Database.ContentValues
 import com.wire.logging.ZLog.ImplicitTag._
 import com.wire.logging.ZLog.verbose
-import com.wire.macros.returning
 import com.wire.threading.{SerialDispatchQueue, Threading}
 
 import scala.concurrent.Future
@@ -55,9 +55,15 @@ trait Database {
   def read[A](f: SQLiteDatabase => A): Future[A]
 
   def withStatement[A](sql: String)(body: PreparedStatement => A): A
+
+  def dropAllTables(): Unit
 }
 
 class SQLiteDatabase(dbFile: File) extends Database {
+
+  private lazy val daos = Seq(
+    AccountDataDao
+  )
 
   //TODO handle multiple threads/connections at some point
   lazy val dispatcher = new SerialDispatchQueue(Threading.IO)
@@ -104,6 +110,10 @@ class SQLiteDatabase(dbFile: File) extends Database {
   override def insertWithOnConflict(tableName: String, nullColumnHack: String, initialValues: ContentValues, conflictAlgorithm: Int) = -1L
 
   override def apply[A](f: (SQLiteDatabase) => A) = dispatcher(f(this)).future
+
+  override def dropAllTables() = {
+
+  }
 }
 
 object Database {

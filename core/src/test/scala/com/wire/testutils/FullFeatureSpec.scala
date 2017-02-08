@@ -38,7 +38,7 @@ abstract class FullFeatureSpec extends FeatureSpec with scalatest.Matchers with 
 
     ZLog.setZLog(new ScalaLoggingZLog)
 
-    DispatchQueueStats.LogLevel = DispatchQueueStats.Verbose
+    DispatchQueueStats.LogLevel = DispatchQueueStats.Debug //change to Verbose to view concurrent behaviour
 
   }
 

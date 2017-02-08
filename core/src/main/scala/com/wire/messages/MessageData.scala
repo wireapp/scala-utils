@@ -25,7 +25,7 @@ import org.threeten.bp.Instant
 
 case class MessageData(id:        MessageId           = MessageId(),
                        convId:    ConvId              = ConvId(),
-                       senderId:    UserId              = UserId(),
+                       senderId:  UserId              = UserId(),
                        msgType:   MessageType         = MessageType.Text,
                        protos:    Seq[GenericMsg] = Seq.empty,
                        localTime: Instant             = Instant.now

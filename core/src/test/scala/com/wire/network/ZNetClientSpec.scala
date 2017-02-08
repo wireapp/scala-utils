@@ -3,6 +3,7 @@ package com.wire.network
 import java.net.URI
 import java.util.concurrent.TimeUnit
 
+import com.wire.auth.Credentials.EmailCredentials
 import com.wire.auth.{Credentials, CredentialsHandler, DefaultLoginClient, EmailAddress}
 import com.wire.config.BackendConfig
 import com.wire.data.AccountId
@@ -22,10 +23,7 @@ import scala.concurrent.duration.{Duration, FiniteDuration}
 class ZNetClientSpec extends FullFeatureSpec {
 
   val credentials = new CredentialsHandler {
-    override def credentials = new Credentials {
-      override val email = Some(EmailAddress("dean+1@wire.com"))
-      override val password = None
-    }
+    override def credentials = EmailCredentials(Some(EmailAddress("dean+1@wire.com")))
 
     private implicit val dispatcher = new SerialDispatchQueue()("DatabaseQueue")
 

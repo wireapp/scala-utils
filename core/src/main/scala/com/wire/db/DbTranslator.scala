@@ -17,20 +17,23 @@
  */
 package com.wire.db
 
-import java.sql.ResultSet
-
+import com.wire.auth.{EmailAddress, Handle, PhoneNumber}
 import com.wire.data.{Id, IdGen}
 
 import scala.language.higherKinds
 
 abstract class DbTranslator[T] {
-  def load(cursor: Cursor, index: Int): T
+  def loadOpt(cursor: Cursor, index: Int): Option[T]
+  def load(cursor: Cursor, index: Int): T = loadOpt(cursor, index) match {
+    case Some(v) => v
+    case None => throw new IllegalStateException(s"Expected non-NULL value from db")
+  }
   def literal(value: T): String
 }
 
 object DbTranslator {
   implicit object StringTranslator extends DbTranslator[String] {
-    override def load(result: Cursor, index: Int): String = result.getString(index)
+    override def loadOpt(cursor: Cursor, index: Int) = cursor.getString(index)
     override def literal(value: String) = value
   }
 //  implicit object UidTranslator extends DbTranslator[Uid] {
@@ -58,12 +61,10 @@ object DbTranslator {
 //    override def save(value: Float, name: String, values: ContentValues): Unit = values.put(name, java.lang.Float.valueOf(value))
 //    override def bind(value: Float, index: Int, stmt: SQLiteProgram): Unit = stmt.bindDouble(index, value)
 //  }
-//  implicit object BooleanTranslator extends DbTranslator[Boolean] {
-//    override def load(cursor: Cursor, index: Int): Boolean = cursor.getInt(index) == 1
-//    override def save(value: Boolean, name: String, values: ContentValues): Unit = values.put(name, if (value) Integer.valueOf(1) else Integer.valueOf(0))
-//    override def bind(value: Boolean, index: Int, stmt: SQLiteProgram): Unit = stmt.bindLong(index, if (value) 1 else 0)
-//    override def literal(value: Boolean): String = if (value) "1" else "0"
-//  }
+  implicit object BooleanTranslator extends DbTranslator[Boolean] {
+    override def loadOpt(cursor: Cursor, index: Int) = cursor.getInt(index).map(_ == 1)
+    override def literal(value: Boolean) = if (value) "1" else "0"
+  }
 //  implicit object DateTranslator extends DbTranslator[Date] {
 //    override def load(cursor: Cursor, index: Int): Date = new Date(cursor.getLong(index))
 //    override def save(value: Date, name: String, values: ContentValues): Unit = values.put(name, java.lang.Long.valueOf(value.getTime))
@@ -82,24 +83,18 @@ object DbTranslator {
 //    override def bind(value: FiniteDuration, index: Int, stmt: SQLiteProgram): Unit = stmt.bindLong(index, value.toMillis)
 //    override def literal(value: FiniteDuration): String = value.toMillis.toString
 //  }
-//  implicit object PhoneNumberTranslator extends DbTranslator[PhoneNumber] {
-//    override def load(cursor: Cursor, index: Int): PhoneNumber = PhoneNumber(cursor.getString(index))
-//    override def save(value: PhoneNumber, name: String, values: ContentValues): Unit = values.put(name, literal(value))
-//    override def bind(value: PhoneNumber, index: Int, stmt: SQLiteProgram): Unit = stmt.bindString(index, literal(value))
-//    override def literal(value: PhoneNumber): String = value.str
-//  }
-//  implicit object EmailAddressTranslator extends DbTranslator[EmailAddress] {
-//    override def load(cursor: Cursor, index: Int): EmailAddress = EmailAddress(cursor.getString(index))
-//    override def save(value: EmailAddress, name: String, values: ContentValues): Unit = values.put(name, literal(value))
-//    override def bind(value: EmailAddress, index: Int, stmt: SQLiteProgram): Unit = stmt.bindString(index, literal(value))
-//    override def literal(value: EmailAddress): String = value.str
-//  }
-//  implicit object HandleTranslator extends DbTranslator[Handle] {
-//    override def load(cursor: Cursor, index: Int): Handle = Handle(cursor.getString(index))
-//    override def save(value: Handle, name: String, values: ContentValues): Unit = values.put(name, literal(value))
-//    override def bind(value: Handle, index: Int, stmt: SQLiteProgram): Unit = stmt.bindString(index, literal(value))
-//    override def literal(value: Handle): String = value.string
-//  }
+  implicit object PhoneNumberTranslator extends DbTranslator[PhoneNumber] {
+    override def loadOpt(cursor: Cursor, index: Int) = cursor.getString(index).map(PhoneNumber)
+    override def literal(value: PhoneNumber) = value.str
+  }
+  implicit object EmailAddressTranslator extends DbTranslator[EmailAddress] {
+    override def loadOpt(cursor: Cursor, index: Int) = cursor.getString(index).map(EmailAddress)
+    override def literal(value: EmailAddress) = value.str
+  }
+  implicit object HandleTranslator extends DbTranslator[Handle] {
+    override def loadOpt(cursor: Cursor, index: Int) = cursor.getString(index).map(Handle)
+    override def literal(value: Handle) = value.string
+  }
 //  implicit def optionTranslator[A](implicit trans: DbTranslator[A]): DbTranslator[Option[A]] = new DbTranslator[Option[A]] {
 //    override def load(cursor: Cursor, index: Int): Option[A] = if (cursor.isNull(index)) None else Some(trans.load(cursor, index))
 //    override def save(value: Option[A], name: String, values: ContentValues): Unit = value match {
@@ -125,7 +120,7 @@ object DbTranslator {
 //    override def literal(value: File): String = value.getCanonicalPath
 //  }
   implicit def idTranslator[A <: Id: IdGen](): DbTranslator[A] = new DbTranslator[A] {
-    override def load(cursor: Cursor, index: Int): A = implicitly[IdGen[A]].decode(cursor.getString(index))
+    override def loadOpt(cursor: Cursor, index: Int) = cursor.getString(index).map(implicitly[IdGen[A]].decode(_))
     override def literal(value: A): String = implicitly[IdGen[A]].encode(value)
   }
 //  implicit def jsonTranslator[A: JsonDecoder : JsonEncoder](): DbTranslator[A] = new DbTranslator[A] {

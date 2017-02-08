@@ -47,7 +47,7 @@ class DefaultLoginClientTest extends FullFeatureSpec {
       .once()
       .returning(CancellableFuture {
         Response(HttpStatus(Response.Status.Success), returnHeaders, returnBody)
-      }(new SerialDispatchQueue(name = "TestAsyncClient")))
+      }(new SerialDispatchQueue()("TestAsyncClient")))
 
     val client = new DefaultLoginClient(mockAync, BackendConfig("https://www.someurl.com"))
 

@@ -41,7 +41,7 @@ lazy val core = (project in file("core"))
       "org.apache.httpcomponents" % "httpclient" % "4.5.3",
       "org.apache.httpcomponents" % "fluent-hc" % "4.5.3",
 
-      "com.twitter" %% "util-cache" % "6.39.0",
+//      "com.twitter" %% "util-cache" % "6.39.0",
 
       "org.apache.commons" % "commons-collections4" % "4.1",
 

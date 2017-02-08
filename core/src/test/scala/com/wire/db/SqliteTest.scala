@@ -31,8 +31,8 @@ class SqliteTest extends FullFeatureSpec {
 
     Seq((1, "leo"), (2, "yui")).foreach { case (id, name) =>
       cur.moveToNext()
-      cur.getString("name") shouldEqual name
-      cur.getInt("id") shouldEqual id
+      cur.getString("name") shouldEqual Some(name)
+      cur.getInt("id") shouldEqual Some(id)
     }
     cur.moveToNext() shouldEqual false
     cur.close()
@@ -43,7 +43,7 @@ class SqliteTest extends FullFeatureSpec {
     val cur = db.query("person", Set("name"), "name = ?", Seq("leo"))
 
     cur.moveToNext()
-    cur.getString("name") shouldEqual "leo"
+    cur.getString("name") shouldEqual Some("leo")
     cur.moveToNext() shouldEqual false
     cur.close()
   }
@@ -52,8 +52,8 @@ class SqliteTest extends FullFeatureSpec {
     val cur = db.query("person", selection = "name = ? OR name = ?", selectionArgs = Seq("leo"))
 
     cur.moveToNext()
-    cur.getString("name") shouldEqual "leo"
-    cur.getInt("id") shouldEqual 1
+    cur.getString("name") shouldEqual Some("leo")
+    cur.getInt("id") shouldEqual Some(1)
 
     cur.moveToNext() shouldEqual false
     cur.close()

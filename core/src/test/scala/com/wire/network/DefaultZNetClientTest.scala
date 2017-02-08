@@ -3,6 +3,7 @@ package com.wire.network
 import java.io.{File, PrintWriter}
 import java.util.concurrent.TimeUnit
 
+import com.wire.auth.Credentials.EmailCredentials
 import com.wire.auth.{Credentials, CredentialsHandler, DefaultLoginClient, EmailAddress}
 import com.wire.config.BackendConfig
 import com.wire.data.AccountId
@@ -24,10 +25,7 @@ import scala.util.Try
 class DefaultZNetClientTest extends FullFeatureSpec {
 
   val credentials = new CredentialsHandler {
-    override def credentials = new Credentials {
-      override val email = Some(EmailAddress("dean+1@wire.com"))
-      override val password = None//Some("aqa123456")
-    }
+    override def credentials = EmailCredentials(Some(EmailAddress("dean+1@wire.com")))
 
     private implicit val dispatcher = new SerialDispatchQueue()("DatabaseQueue")
 
