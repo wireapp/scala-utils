@@ -1,26 +1,60 @@
-package com.wire.accounts
+package com.wire.db
 
-import com.wire.accounts.AccountData.{ClientRegistrationState, ClientRegistrationState}
+import java.io.File
+
+import com.wire.accounts.AccountData
+import com.wire.accounts.AccountData.{AccountDataDao, ClientRegistrationState}
+import com.wire.accounts.AccountData.AccountDataDao.{Table, delete, iterating}
+import com.wire.accounts.AccountData.ClientRegistrationState.Value
 import com.wire.auth.AuthenticationManager.Cookie
 import com.wire.auth.Credentials.{EmailCredentials, PhoneCredentials}
 import com.wire.auth.{Credentials, EmailAddress, Handle, PhoneNumber}
 import com.wire.data._
-import com.wire.db.{Cursor, Dao, Database}
+import com.wire.db.OldAccountData.OldAccountDataDao
 import com.wire.network.AccessTokenProvider.Token
+import com.wire.testutils.FullFeatureSpec
 
-case class AccountData(id:             AccountId,
-                       email:          Option[EmailAddress]    = None,
-                       hash:           String                  = "",
-                       phone:          Option[PhoneNumber]     = None,
-                       handle:         Option[Handle]          = None,
-                       activated:      Boolean                 = false,
-                       cookie:         Cookie                  = None,
-                       password:       Option[String]          = None,
-                       accessToken:    Option[Token]           = None,
-                       userId:         Option[UserId]          = None,
-                       clientId:       Option[ClientId]        = None,
-                       clientRegState: ClientRegistrationState = ClientRegistrationState.Unknown,
-                       privateMode:    Boolean                 = false) {
+class MigrationTest extends FullFeatureSpec {
+
+  scenario("ZGlobal DB Copied from main project") {
+
+
+
+    val db: Database = new SQLiteDatabase(new File("core/src/test/resources/database.db")) {
+
+      override val daos = Seq(OldAccountDataDao)
+
+      override val migrations = Seq(
+        Migration(1, 2) { db =>
+          db.execSQL("ALTER TABLE Accounts ADD COLUMN handle TEXT DEFAULT ''")
+          db.execSQL("ALTER TABLE Accounts ADD COLUMN private_mode BOOL DEFAULT false")
+        }
+      )
+
+    }
+
+    db.dropAllTables()
+
+    db.onCreate()
+
+
+    db.onUpgrade(1, 2)
+
+  }
+
+}
+
+case class OldAccountData(id:             AccountId,
+                     email:          Option[EmailAddress]          = None,
+                     hash:           String                        = "",
+                     phone:          Option[PhoneNumber]           = None,
+                     activated:      Boolean                       = false,
+                     cookie:         Cookie                        = None,
+                     password:       Option[String]                = None,
+                     accessToken:    Option[Token]                 = None,
+                     userId:         Option[UserId]                = None,
+                     clientId:       Option[ClientId]              = None,
+                     clientRegState: ClientRegistrationState.Value = ClientRegistrationState.Unknown) {
 
   override def toString: String =
     s"""
@@ -29,7 +63,6 @@ case class AccountData(id:             AccountId,
        | email:          $email
        | hash:           $hash
        | phone:          $phone
-       | handle:         $handle
        | activated:      $activated
        | cookie:         $cookie
        | password:       $password
@@ -37,7 +70,6 @@ case class AccountData(id:             AccountId,
        | userId:         $userId
        | clientId:       $clientId
        | clientRegState: $clientRegState
-       | privateMode:    $privateMode
     """.stripMargin
 
   def authorized(credentials: Credentials) = credentials match {
@@ -63,16 +95,16 @@ case class AccountData(id:             AccountId,
     case _ => Credentials.Empty
   }
 
-//  def updated(user: UserInfo) =
-//    copy(userId = Some(user.id), email = user.email.orElse(email), phone = user.phone.orElse(phone), activated = true, handle = user.handle.orElse(handle), privateMode = user.privateMode.getOrElse(privateMode))
+  //  def updated(user: UserInfo) =
+  //    copy(userId = Some(user.id), email = user.email.orElse(email), phone = user.phone.orElse(phone), activated = true, handle = user.handle.orElse(handle), privateMode = user.privateMode.getOrElse(privateMode))
 
-//  def updated(userId: Option[UserId], activated: Boolean, clientId: Option[ClientId], clientRegState: ClientRegistrationState) =
-//    copy(userId = userId orElse this.userId, activated = this.activated | activated, clientId = clientId orElse this.clientId, clientRegState = clientRegState)
+  //  def updated(userId: Option[UserId], activated: Boolean, clientId: Option[ClientId], clientRegState: ClientRegistrationState) =
+  //    copy(userId = userId orElse this.userId, activated = this.activated | activated, clientId = clientId orElse this.clientId, clientRegState = clientRegState)
 }
 
 
 
-object AccountData {
+object OldAccountData {
 
   def apply(id: AccountId, email: String, hash: String): AccountData = AccountData(id, email = Some(EmailAddress(email)), hash, phone = None, handle = None)  // used only for testing
 
@@ -86,7 +118,7 @@ object AccountData {
 
   def computeHash(id: AccountId, password: String) = password
 
-  implicit object AccountDataDao extends Dao[AccountData, AccountId] {
+  implicit object OldAccountDataDao extends Dao[OldAccountData, AccountId] {
     import com.wire.db.Col._
 
     val Id             = id[AccountId]('_id, "PRIMARY KEY").apply(_.id)
@@ -98,14 +130,13 @@ object AccountData {
     val Token          = opt(text[Token]('access_token, JsonEncoder.encodeString[Token], JsonDecoder.decode[Token]))(_.accessToken)
     val UserId         = opt(id[UserId]('user_id)).apply(_.userId)
     val ClientId       = opt(id[ClientId]('client_id))(_.clientId)
-    val ClientRegState = text[ClientRegistrationState]('reg_state, _.toString, ClientRegistrationState.withName)(_.clientRegState)
-    val Handle         = opt(handle('handle))(_.handle)
-    val PrivateMode    = bool('private_mode)(_.privateMode)
+    val ClientRegState = text[ClientRegState.Value]('reg_state, _.toString, ClientRegState.withName)(_.clientRegState)
 
     override val idCol = Id
-    override val table = Table("Accounts", Id, Email, Hash, Activated, Cookie, Phone, Token, UserId, ClientId, ClientRegState, Handle, PrivateMode)
 
-    override def apply(implicit cursor: Cursor): AccountData = AccountData(Id, Email, Hash, Phone, Handle, Activated, Cookie, None, Token, UserId, ClientId, ClientRegState, PrivateMode)
+    override val table = Table("Accounts", Id, Email, Hash, Activated, Cookie, Phone, Token, UserId, ClientId, ClientRegState)
+
+    override def apply(implicit cursor: Cursor): OldAccountData = OldAccountData(Id, Email, Hash, Phone, Activated, Cookie, None, Token, UserId, ClientId, ClientRegState)
 
     def findByEmail(email: EmailAddress)(implicit db: Database) =
       iterating(db.query(table.name, selection = s"${Email.name} = ?", selectionArgs = Seq(email.str)))
@@ -119,9 +150,5 @@ object AccountData {
     def deleteForEmail(email: EmailAddress)(implicit db: Database) = delete(Email, Some(email))
   }
 
-  object ClientRegistrationState extends Enumeration {
-    val Registered, PasswordMissing, LimitReached, Unknown = Value
-  }
-  type ClientRegistrationState = ClientRegistrationState.Value
-
 }
+

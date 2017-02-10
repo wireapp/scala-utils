@@ -21,16 +21,18 @@ package com.wire.db
 import java.io.File
 import java.sql.{DriverManager, PreparedStatement}
 
-import com.wire.accounts.AccountData.AccountDataDao
 import com.wire.data.Managed
 import com.wire.db.Database.ContentValues
 import com.wire.logging.ZLog.ImplicitTag._
-import com.wire.logging.ZLog.verbose
+import com.wire.logging.ZLog.{verbose, warn}
 import com.wire.threading.{SerialDispatchQueue, Threading}
 
 import scala.concurrent.Future
 
 trait Database {
+
+  def daos = Seq.empty[BaseDao[_]]
+  def migrations = Seq.empty[Migration]
 
   import Database._
 
@@ -57,13 +59,13 @@ trait Database {
   def withStatement[A](sql: String)(body: PreparedStatement => A): A
 
   def dropAllTables(): Unit
+
+  def onCreate() = daos.foreach(_.onCreate(this))
+
+  def onUpgrade(from: Int, to: Int) = new Migrations(migrations: _*).migrate(this, from, to)
 }
 
 class SQLiteDatabase(dbFile: File) extends Database {
-
-  private lazy val daos = Seq(
-    AccountDataDao
-  )
 
   //TODO handle multiple threads/connections at some point
   lazy val dispatcher = new SerialDispatchQueue(Threading.IO)
@@ -112,7 +114,10 @@ class SQLiteDatabase(dbFile: File) extends Database {
   override def apply[A](f: (SQLiteDatabase) => A) = dispatcher(f(this)).future
 
   override def dropAllTables() = {
-
+    warn(s"Dropping all tables: $daos")
+    daos.foreach { dao =>
+      execSQL(s"DROP TABLE IF EXISTS ${dao.table.name};")
+    }
   }
 }
 
