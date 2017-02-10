@@ -94,14 +94,14 @@ abstract class DaoIdOps[T] extends BaseDao[T] {
 
   def delete(id: IdVals)(implicit db: Database): Int = db.delete(table.name, builtIdCols, idValueSplitter(id))
 
-//  def deleteEvery(ids: GenTraversableOnce[IdVals])(implicit db: Database): Unit = inTransaction {
-//    withDatabase(s"DELETE FROM ${table.name} WHERE $builtIdCols") { stmt =>
-//      ids.foreach { id =>
-//        idValueSplitter(id).zipWithIndex foreach { case (v, idx) => stmt.bindString(idx + 1, v) }
-//        stmt.execute()
-//      }
-//    }
-//  }
+  def deleteEvery(ids: GenTraversableOnce[IdVals])(implicit db: Database): Unit = {
+    db.withStatement(s"DELETE FROM ${table.name} WHERE $builtIdCols") { stmt =>
+      ids.foreach { id =>
+        idValueSplitter(id).zipWithIndex foreach { case (v, idx) => stmt.setString(idx + 1, v) }
+        stmt.execute()
+      }
+    }
+  }
 
   def update(item: T)(f: T => T)(implicit db: Database): Option[T] = updateById(idExtractor(item))(f)
 

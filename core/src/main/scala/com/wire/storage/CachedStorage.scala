@@ -18,14 +18,11 @@
  */
 package com.wire.storage
 
-import com.wire.assets.AssetData
-import com.wire.data.AssetId
-import com.wire.db.{Dao, DaoIdOps, Database}
-import com.wire.logging.ZLog
+import com.wire.db.{Dao, Database}
 import com.wire.logging.ZLog.verbose
 import com.wire.macros.logging.LogTag
 import com.wire.macros.returning
-import com.wire.reactive.EventStream
+import com.wire.reactive.{AggregatingSignal, EventStream, Signal}
 import com.wire.threading.SerialDispatchQueue
 import org.apache.commons.collections4.map.LRUMap
 
@@ -57,11 +54,11 @@ trait CachedStorage[K, V] {
   //  def onChanged(key: K): EventStream[V]
   //
   //  def onRemoved(key: K): EventStream[K]
-  //
-  //  def optSignal(key: K): Signal[Option[V]]
-  //
-  //  def signal(key: K): Signal[V]
-  //
+
+  def optSignal(key: K): Signal[Option[V]]
+
+  def signal(key: K): Signal[V]
+
   def insert(v: V): Future[V]
   //
   //  def insert(vs: Traversable[V]): Future[Set[V]]
@@ -92,7 +89,7 @@ trait CachedStorage[K, V] {
   //
   //  def getRawCached(key: K): Option[V]
   //
-  //  def remove(key: K): Future[Unit]
+  def remove(key: K): Future[Unit]
   //
   //  def remove(keys: Iterable[K]): Future[Unit]
   //
@@ -116,7 +113,19 @@ abstract class LRUCacheStorage[K, V](cacheSize: Int, dao: Dao[V, K], db: Databas
 
   def get(key: K) = cachedOrElse(key, Future {cachedOrElse(key, loadFromDb(key))}.flatMap(identity))
 
-  def insert(value: V) = addInternal(dao.idExtractor(value), value)
+  def insert(value: V) = put(dao.idExtractor(value), value)
+
+  def remove(key: K): Future[Unit] = Future {
+    cache.put(key, None)
+    returning(db { delete(Seq(key))(_) }) { _ => onDeleted ! Seq(key) }
+  }
+
+  override def optSignal(key: K) = {
+    val changeOrDelete = onChanged(key).map(Option(_)).union(onRemoved(key).map(_ => Option.empty[V]))
+    new AggregatingSignal[Option[V], Option[V]](changeOrDelete, get(key), { (_, v) => v })
+  }
+
+  override def signal(key: K) = optSignal(key).collect { case Some(v) => v }
 
   private def cachedOrElse(key: K, default: => Future[Option[V]]): Future[Option[V]] =
     Option(cache.get(key)).fold(default)(Future.successful)
@@ -132,13 +141,19 @@ abstract class LRUCacheStorage[K, V](cacheSize: Int, dao: Dao[V, K], db: Databas
 
   private def save(values: Seq[V])(implicit db: Database) = dao.insertOrReplace(values)
 
-  private def addInternal(key: K, value: V) = {
+  private def put(key: K, value: V) = {
     verbose(s"Inserting: $key, $value")
     cache.put(key, Some(value))
     returning(db {save(Seq(value))(_)}.map( _ => value)) { _ =>
       onAdded ! Seq(value)
     }
   }
+
+  private def delete(keys: Iterable[K])(implicit db: Database): Unit = dao.deleteEvery(keys)
+
+  private def onChanged(key: K): EventStream[V] = onChanged.map(_.view.filter(v => dao.idExtractor(v) == key).lastOption).collect { case Some(v) => v }
+
+  private def onRemoved(key: K): EventStream[K] = onDeleted.map(_.view.filter(_ == key).lastOption).collect { case Some(k) => k }
 
 }
 
