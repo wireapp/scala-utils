@@ -25,6 +25,7 @@ import com.wire.data.Managed
 import com.wire.db.Database.ContentValues
 import com.wire.logging.ZLog.ImplicitTag._
 import com.wire.logging.ZLog.{verbose, warn}
+import com.wire.macros.returning
 import com.wire.threading.{SerialDispatchQueue, Threading}
 
 import scala.concurrent.Future
@@ -90,7 +91,9 @@ class SQLiteDatabase(dbFile: File) extends Database {
       stmt.setString(i + 1, arg)
     }
 
-    Cursor(stmt, stmt.executeQuery())
+    Cursor(stmt, returning(stmt.executeQuery()) { rs =>
+      verbose(s"Fetched results, is already closed? ${rs.isClosed}")
+    })
   }
 
   override def withStatement[A](sql: String)(body: PreparedStatement => A): A = {

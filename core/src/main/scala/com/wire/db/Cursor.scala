@@ -2,6 +2,9 @@ package com.wire.db
 
 import java.sql.{ResultSet, Statement}
 
+import com.wire.logging.ZLog.ImplicitTag._
+import com.wire.logging.ZLog.verbose
+
 /**
   * Allows keeping connection open while ResultSet is being used outside of Database class, and also
   * provides a nice way to wrap the android methods, making copying easier
@@ -9,6 +12,7 @@ import java.sql.{ResultSet, Statement}
 case class Cursor(st: Statement, resultSet: ResultSet) extends AutoCloseable {
 
   def close() = {
+    verbose("Closing cursor")
     st.close()
     st.getConnection.close()
   }
@@ -33,7 +37,7 @@ case class Cursor(st: Statement, resultSet: ResultSet) extends AutoCloseable {
 
   private def returnWithNullCheck[A](value: ResultSet => A): Option[A] = {
     val r = value(resultSet)
-    if (resultSet.wasNull()) None else Some(r)
+    if (resultSet.wasNull() || r == "NULL") None else Some(r)
   }
 
 }

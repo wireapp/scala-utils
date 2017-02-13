@@ -5,6 +5,10 @@ import java.util.Locale
 
 object Locales {
 
+  //TODO
+  lazy val transliteration = new Transliteration {
+    override def transliterate(s: String) = s
+  }
 
   def currentLocale: Locale = Locale.getDefault
 
@@ -13,4 +17,8 @@ object Locales {
     private[this] val collator = Collator.getInstance(currentLocale)
     final def compare(a: String, b: String): Int = collator.compare(a, b)
   }
+}
+
+trait Transliteration {
+  def transliterate(s: String): String
 }

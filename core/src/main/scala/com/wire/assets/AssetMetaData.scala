@@ -100,7 +100,7 @@ object AssetMetaData {
       * To simplify implementations, I'm going with two internal tags, "preview" and "medium". Depending on where they're
       * used though, they may be translated into "smallProfile" or "complete"
       *
-      * TODO Dean: it would be nice to sync up with other clients and steadily introduce a more uniform set of tags
+      * TODO Dean: it would be nice to com.wire.sync up with other clients and steadily introduce a more uniform set of tags
       */
 
     object Tag {

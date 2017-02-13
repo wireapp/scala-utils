@@ -49,7 +49,10 @@ class DefaultLoginClient(client: AsyncClient, backend: BackendConfig) extends Lo
       math.max(nextRunTime - System.currentTimeMillis(), 0).millis
     }
 
-  override def login(accountId: AccountId, credentials: Credentials): CancellableFuture[LoginResult] = throttled(loginNow(accountId, credentials))
+  override def login(accountId: AccountId, credentials: Credentials): CancellableFuture[LoginResult] = {
+    warn(s"logging in: $accountId")
+    throttled(loginNow(accountId, credentials))
+  }
 
   override def access(cookie: Option[String], token: Option[Token]) = throttled(accessNow(cookie, token))
 

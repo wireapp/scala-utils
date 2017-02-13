@@ -19,8 +19,12 @@
   package com.wire.users
 
 import com.wire.data.UserId
-import com.wire.storage.CachedStorage
+import com.wire.db.Database
+import com.wire.storage.{CachedStorage, LRUCacheStorage}
+import com.wire.users.UserData.UserDataDao
 
-trait UserStorage extends CachedStorage[UserId, UserData] {
+trait UserStorage extends CachedStorage[UserId, UserData]
 
-}
+class DefaultUserStorage(db: Database) extends LRUCacheStorage[UserId, UserData](2000, UserDataDao, db) with UserStorage
+
+

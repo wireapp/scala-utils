@@ -42,7 +42,7 @@ class EventsClient(engine: ZNetClient, val backoff: ExponentialBackoff) {
     * There is no way a GCM notification can reach us before the end of the last request without that request
     * then coming back up-to-date. That then means that we can just ignore any duplicate triggers while there is a request.
     *
-    * If we somehow get a GCM notification that is out-of-order with the last sync, worst case is that we send off
+    * If we somehow get a GCM notification that is out-of-order with the last com.wire.sync, worst case is that we send off
     * another request with the since id being the latest Id anyway, so we'll get back an empty list from BE. We could
     * alternatively check the timestamps to avoid this unnecessary request, but it's really not a big deal.
     */
@@ -93,7 +93,7 @@ object PushNotification {
 object EventsClient {
   /**
     * @param lastIdFound = whether the lastStableId was included in the first page of notifications received from the BE.
-    *                   if not, the BE has probably already removed that history and we have to trigger a slow sync.
+    *                   if not, the BE has probably already removed that history and we have to trigger a slow com.wire.sync.
     */
   case class LoadNotsResponse(nots: Vector[PushNotification], lastIdFound: Boolean)
 

@@ -22,7 +22,9 @@ import java.net.URI
 import java.text.SimpleDateFormat
 import java.util.{Date, TimeZone}
 
+import com.waz.model.Handle
 import com.wire.assets.AssetToken
+import com.wire.auth.{EmailAddress, Handle, PhoneNumber}
 import com.wire.cryptography.{AESKey, Sha256}
 import com.wire.data.Dimensions.{H, W}
 import com.wire.utils.RichDate
@@ -145,10 +147,11 @@ object JsonDecoder {
 //  implicit def decodeArray[A](s: Symbol)(implicit js: JSONObject, dec: JsonDecoder[A], ct: ClassTag[A]): Array[A] = decodeColl[A, Array](s)
 //  def decodeColl[A, B[_]](s: Symbol)(implicit js: JSONObject, dec: JsonDecoder[A], cbf: CanBuild[A, B[A]]): B[A] = if (js.has(s.name) && !js.isNull(s.name)) arrayColl[A, B](js.getJSONArray(s.name)) else cbf.apply.result
 //
-//  implicit def decodeEmailAddress(s: Symbol)(implicit js: JSONObject): EmailAddress = EmailAddress(js.getString(s.name))
-//  implicit def decodeOptEmailAddress(s: Symbol)(implicit js: JSONObject): Option[EmailAddress] = opt(s, js => EmailAddress(js.getString(s.name)))
-//  implicit def decodePhoneNumber(s: Symbol)(implicit js: JSONObject): PhoneNumber = PhoneNumber(js.getString(s.name))
-//  implicit def decodeOptPhoneNumber(s: Symbol)(implicit js: JSONObject): Option[PhoneNumber] = opt(s, js => PhoneNumber(js.getString(s.name)))
+  implicit def decodeEmailAddress(s: Symbol)(implicit js: JSONObject): EmailAddress = EmailAddress(js.getString(s.name))
+  implicit def decodeOptEmailAddress(s: Symbol)(implicit js: JSONObject): Option[EmailAddress] = opt(s, js => EmailAddress(js.getString(s.name)))
+  implicit def decodePhoneNumber(s: Symbol)(implicit js: JSONObject): PhoneNumber = PhoneNumber(js.getString(s.name))
+  implicit def decodeOptHandle(s: Symbol)(implicit js: JSONObject): Option[Handle] = opt(s, js => Handle(js.getString(s.name)))
+  implicit def decodeOptPhoneNumber(s: Symbol)(implicit js: JSONObject): Option[PhoneNumber] = opt(s, js => PhoneNumber(js.getString(s.name)))
 //
 //  implicit def decodeGcmSenderId(s: Symbol)(implicit js: JSONObject): GcmSenderId = GcmSenderId(js.getString(s.name))
 //
@@ -168,6 +171,7 @@ object JsonDecoder {
   implicit def decodeClientId(s: Symbol)(implicit js: JSONObject): ClientId = ClientId(js.getString(s.name))
   implicit def decodeAssetId(s: Symbol)(implicit js: JSONObject): AssetId = AssetId(js.getString(s.name))
   implicit def decodeRAssetId(s: Symbol)(implicit js: JSONObject): RAssetId = RAssetId(js.getString(s.name))
+  implicit def decodeAESKey(s: Symbol)(implicit js: JSONObject): AESKey = AESKey(js.getString(s.name))
   implicit def decodeMessageId(s: Symbol)(implicit js: JSONObject): MessageId = MessageId(js.getString(s.name))
 
   implicit def decodeId[A <: Id](s: Symbol)(implicit js: JSONObject, id: IdGen[A]): A = id.decode(js.getString(s.name))

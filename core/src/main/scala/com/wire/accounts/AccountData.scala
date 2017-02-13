@@ -1,12 +1,13 @@
 package com.wire.accounts
 
-import com.wire.accounts.AccountData.{ClientRegistrationState, ClientRegistrationState}
+import com.wire.accounts.AccountData.ClientRegistrationState
 import com.wire.auth.AuthenticationManager.Cookie
 import com.wire.auth.Credentials.{EmailCredentials, PhoneCredentials}
 import com.wire.auth.{Credentials, EmailAddress, Handle, PhoneNumber}
 import com.wire.data._
 import com.wire.db.{Cursor, Dao, Database}
 import com.wire.network.AccessTokenProvider.Token
+import com.wire.users.UserInfo
 
 case class AccountData(id:             AccountId,
                        email:          Option[EmailAddress]    = None,
@@ -63,11 +64,17 @@ case class AccountData(id:             AccountId,
     case _ => Credentials.Empty
   }
 
-//  def updated(user: UserInfo) =
-//    copy(userId = Some(user.id), email = user.email.orElse(email), phone = user.phone.orElse(phone), activated = true, handle = user.handle.orElse(handle), privateMode = user.privateMode.getOrElse(privateMode))
+  def updated(user: UserInfo) =
+    copy(
+      userId      = Some(user.id),
+      email       = user.email.orElse(email),
+      phone       = user.phone.orElse(phone),
+      activated   = true,
+      handle      = user.handle.orElse(handle),
+      privateMode = user.privateMode.getOrElse(privateMode))
 
-//  def updated(userId: Option[UserId], activated: Boolean, clientId: Option[ClientId], clientRegState: ClientRegistrationState) =
-//    copy(userId = userId orElse this.userId, activated = this.activated | activated, clientId = clientId orElse this.clientId, clientRegState = clientRegState)
+  def updated(userId: Option[UserId], activated: Boolean, clientId: Option[ClientId], clientRegState: ClientRegistrationState) =
+    copy(userId = userId orElse this.userId, activated = this.activated | activated, clientId = clientId orElse this.clientId, clientRegState = clientRegState)
 }
 
 

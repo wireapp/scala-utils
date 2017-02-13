@@ -17,10 +17,11 @@
  */
 package com.wire.db
 
-import java.sql.{PreparedStatement, ResultSet}
+import java.sql.PreparedStatement
 
 import com.wire.auth.{EmailAddress, Handle, PhoneNumber}
 import com.wire.data.{Id, IdGen}
+import org.threeten.bp.Instant
 
 import scala.collection.mutable
 import scala.language.higherKinds
@@ -74,7 +75,7 @@ object Col {
   })
   def id[A <: Id: IdGen](name: Symbol, modifiers: String = "") = Col[A](name.name, "TEXT", modifiers)(DbTranslator.idTranslator())
 //  def uid(name: Symbol, modifiers: String = "") = Col[Uid](name.name, "TEXT", modifiers)
-//  def int(name: Symbol, modifiers: String = "") = Col[Int](name.name, "INTEGER", modifiers)
+  def int(name: Symbol, modifiers: String = "") = Col[Int](name.name, "INTEGER", modifiers)
 //  def int[A](name: Symbol, enc: A => Int, dec: Int => A) = Col[A](name.name, "INTEGER")(new DbTranslator[A] {
 //    override def save(value: A, name: String, values: ContentValues): Unit = values.put(name, Integer.valueOf(enc(value)))
 //    override def bind(value: A, index: Int, stmt: SQLiteProgram): Unit = stmt.bindLong(index, enc(value))
@@ -90,10 +91,9 @@ object Col {
   def phoneNumber(name: Symbol, modifiers: String = "") = Col[PhoneNumber](name.name, "TEXT", modifiers)
   def emailAddress(name: Symbol, modifiers: String = "") = Col[EmailAddress](name.name, "TEXT", modifiers)
   def handle(name: Symbol, modifiers: String = "") = Col[Handle](name.name, "TEXT", modifiers)
-//  def date(name: Symbol, modifiers: String = "") = Col[Date](name.name, "INTEGER", modifiers)
 //  def finiteDuration(name: Symbol, modifiers: String = "") = Col[FiniteDuration](name.name, "INTEGER", modifiers)
-//  def timestamp(name: Symbol, modifiers: String = "") = Col[Instant](name.name, "INTEGER", modifiers)
-//  def long(name: Symbol, modifiers: String = "") = Col[Long](name.name, "INTEGER", modifiers)
+  def timestamp(name: Symbol, modifiers: String = "") = Col[Instant](name.name, "INTEGER", modifiers)
+  def long(name: Symbol, modifiers: String = "") = Col[Long](name.name, "INTEGER", modifiers)
 //  def long[A](name: Symbol, enc: A => Long, dec: Long => A) = Col[A](name.name, "INTEGER")(new DbTranslator[A] {
 //    override def save(value: A, name: String, values: ContentValues): Unit = values.put(name, java.lang.Long.valueOf(enc(value)))
 //    override def bind(value: A, index: Int, stmt: SQLiteProgram): Unit = stmt.bindLong(index, enc(value))

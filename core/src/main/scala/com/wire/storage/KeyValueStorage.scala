@@ -22,10 +22,13 @@ import com.wire.db.{Cursor, Dao, Database}
 import com.wire.storage.KeyValueData.KeyValueDataDao
 import com.wire.storage.KeyValueStorage.KeyValuePref
 import com.wire.storage.Preference.PrefCodec
+import com.wire.logging.ZLog.ImplicitTag._
 
 import scala.concurrent.{ExecutionContext, Future}
 
 trait KeyValueStorage extends CachedStorage[String, KeyValueData] {
+
+
   def getPref(key: String):                         Future[Option[String]] = get(key).map(_.map(_.value))
   def setPref(key: String, value: String):          Future[KeyValueData]   = insert(KeyValueData(key, value))
   def delPref(key: String):                         Future[Unit]           = remove(key)

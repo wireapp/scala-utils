@@ -18,6 +18,7 @@
  */
 package com.wire.storage
 
+import com.wire.data.Managed
 import com.wire.db.{Dao, Database}
 import com.wire.logging.ZLog.verbose
 import com.wire.macros.logging.LogTag
@@ -27,9 +28,16 @@ import com.wire.threading.SerialDispatchQueue
 import org.apache.commons.collections4.map.LRUMap
 
 import scala.collection._
+import scala.collection.JavaConverters._
+import scala.collection.generic.CanBuild
 import scala.concurrent.Future
 
+
 trait CachedStorage[K, V] {
+
+  protected implicit def tag: LogTag
+  protected implicit val dispatcher = new SerialDispatchQueue()
+
   val onAdded:   EventStream[Seq[V]]
   val onUpdated: EventStream[Seq[(V, V)]]
   val onDeleted: EventStream[Seq[K]]
@@ -43,7 +51,7 @@ trait CachedStorage[K, V] {
   //
   //  protected def delete(keys: Iterable[K]): Unit
   //
-  //  def find[A, B](predicate: V => Boolean, search: Database => Managed[TraversableOnce[V]], mapping: V => A): Future[B]
+  def find[A, B](predicate: V => Boolean, search: Database => Managed[TraversableOnce[V]], mapping: V => A)(implicit cb: CanBuild[A, B]): Future[B]
   //
   //  def filterCached(f: V => Boolean): Future[Vector[V]]
   //
@@ -71,13 +79,13 @@ trait CachedStorage[K, V] {
   //
   //  def getAll(keys: Traversable[K]): Future[Seq[Option[V]]]
   //
-  //  def update(key: K, updater: V => V): Future[Option[(V, V)]]
+  def update(key: K, updater: V => V): Future[Option[(V, V)]]
   //
   //  def updateAll(updaters: scala.collection.Map[K, V => V]): Future[Seq[(V, V)]]
   //
   //  def updateAll2(keys: Iterable[K], updater: V => V): Future[Seq[(V, V)]]
   //
-  //  def updateOrCreate(key: K, updater: V => V, creator: => V): Future[V]
+  def updateOrCreate(key: K, updater: V => V, creator: => V): Future[V]
   //
   //  def updateOrCreateAll(updaters: K Map (Option[V] => V)): Future[Set[V]]
   //
@@ -100,9 +108,7 @@ trait CachedStorage[K, V] {
   * Note, any operation that hits the database should also hit the cache to ensure that the LRU ordering
   * changes
   */
-abstract class LRUCacheStorage[K, V](cacheSize: Int, dao: Dao[V, K], db: Database)(implicit tag: LogTag) extends CachedStorage[K, V] {
-
-  private implicit val dispatcher = new SerialDispatchQueue()
+abstract class LRUCacheStorage[K, V](cacheSize: Int, dao: Dao[V, K], db: Database)(implicit val tag: LogTag) extends CachedStorage[K, V] {
 
   override val onAdded   = EventStream[Seq[V]]()
   override val onUpdated = EventStream[Seq[(V, V)]]()
@@ -120,12 +126,57 @@ abstract class LRUCacheStorage[K, V](cacheSize: Int, dao: Dao[V, K], db: Databas
     returning(db { delete(Seq(key))(_) }) { _ => onDeleted ! Seq(key) }
   }
 
-  override def optSignal(key: K) = {
+  //  protected def load(key: K): Option[V]
+  def find[A, B](predicate: (V) => Boolean, search: (Database) => Managed[TraversableOnce[V]], mapping: (V) => A)(implicit cb: CanBuild[A, B]) = Future {
+    val matches = cb.apply()
+    val snapshot = cache.clone().asScala
+
+    snapshot.foreach {
+      case (k, Some(v)) if predicate(v) => matches += mapping(v)
+      case _ =>
+    }
+    (snapshot.keySet, matches)
+  } flatMap { case (wasCached, matches) =>
+    db.read { database =>
+      val uncached = Map.newBuilder[K, V]
+      search(database).acquire { rows =>
+        rows.foreach { v =>
+          val k = dao.idExtractor(v)
+          if (! wasCached(k)) {
+            matches += mapping(v)
+            uncached += k -> v
+          }
+        }
+
+        (matches.result, uncached.result)
+      }
+    }
+  } map { case (results, uncached) =>
+    // cache might have changed already at this point, but that would mean the write would have been issued after this read anyway, so we can safely return the outdated values here
+
+    uncached.foreach { case (k, v) =>
+      if (cache.get(k) eq null) cache.put(k, Some(v))
+    }
+
+    results
+  }
+
+  def update(key: K, updater: V => V) = get(key) flatMap { loaded =>
+    val prev = Option(cache.get(key)).getOrElse(loaded)
+    prev.fold(Future successful Option.empty[(V, V)]) { updateInternal(key, updater)(_) }
+  }
+
+  def updateOrCreate(key: K, updater: (V) => V, creator: => V) = get(key) flatMap { loaded =>
+    val prev = Option(cache.get(key)).getOrElse(loaded)
+    prev.fold { put(key, creator) } { v => updateInternal(key, updater)(v).map(_.fold(v)(_._2)) }
+  }
+
+  def optSignal(key: K) = {
     val changeOrDelete = onChanged(key).map(Option(_)).union(onRemoved(key).map(_ => Option.empty[V]))
     new AggregatingSignal[Option[V], Option[V]](changeOrDelete, get(key), { (_, v) => v })
   }
 
-  override def signal(key: K) = optSignal(key).collect { case Some(v) => v }
+  def signal(key: K) = optSignal(key).collect { case Some(v) => v }
 
   private def cachedOrElse(key: K, default: => Future[Option[V]]): Future[Option[V]] =
     Option(cache.get(key)).fold(default)(Future.successful)
@@ -146,6 +197,17 @@ abstract class LRUCacheStorage[K, V](cacheSize: Int, dao: Dao[V, K], db: Databas
     cache.put(key, Some(value))
     returning(db {save(Seq(value))(_)}.map( _ => value)) { _ =>
       onAdded ! Seq(value)
+    }
+  }
+
+  protected def updateInternal(key: K, updater: V => V)(current: V): Future[Option[(V, V)]] = {
+    val updated = updater(current)
+    if (updated == current) Future.successful(None)
+    else {
+      cache.put(key, Some(updated))
+      returning(db { save(Seq(updated))(_) }.map { _ => Some((current, updated)) }) { _ =>
+        onUpdated ! Seq((current, updated))
+      }
     }
   }
 

@@ -46,7 +46,7 @@ abstract class Dao[T, A] extends DaoIdOps[T] {
 
   override def getAll(ids: Set[A])(implicit db: Database): Vector[T] =
     if (ids.isEmpty) Vector.empty
-    else list(db.query(table.name, null, s"${idCol.name} IN (${ids.map(idCol.col.sqlLiteral).mkString("'", "','", "'")})", null, null, null, null))
+    else list(db.query(table.name, selection = s"${idCol.name} IN (${ids.map(idCol.col.sqlLiteral).mkString("'", "','", "'")})"))
 }
 
 abstract class Dao2[T, A, B] extends DaoIdOps[T] {
@@ -90,7 +90,7 @@ abstract class DaoIdOps[T] extends BaseDao[T] {
 
   def getCursor(id: IdVals)(implicit db: Database) = findById(id)
 
-  private def findById(id: IdVals)(implicit db: Database): Cursor = db.query(table.name, null, builtIdCols, idValueSplitter(id), null, null, null, "1")
+  private def findById(id: IdVals)(implicit db: Database): Cursor = db.query(table.name, selection = builtIdCols, selectionArgs = idValueSplitter(id), limit = "1")
 
   def delete(id: IdVals)(implicit db: Database): Int = db.delete(table.name, builtIdCols, idValueSplitter(id))
 
@@ -124,7 +124,7 @@ abstract class BaseDao[T] extends Reader[T] {
 
   def iterating(c: => Cursor): Managed[Iterator[T]] = Database.iteratingWithReader(this)(c)
 
-  def single(c: Cursor, close: Boolean = true): Option[T] = try { if (c.moveToFirst()) Option(apply(c)) else None } finally { if (close) c.close() }
+  def single(c: Cursor, close: Boolean = true): Option[T] = try { Option(apply(c))} finally { if (close) c.close() }
 
   def list(c: Cursor, close: Boolean = true, filter: T => Boolean = { _ => true }): Vector[T] = try { CursorIterator(c)(this).filter(filter).toVector } finally { if (close) c.close() }
 
@@ -138,7 +138,7 @@ abstract class BaseDao[T] extends Reader[T] {
 
   def find[A](col: Column[A], value: A)(implicit db: Database): Cursor = db.query(table.name, selection = s"${col.name} = ?", selectionArgs = Seq(col(value)))
 
-  def findInSet[A](col: Column[A], values: Set[A])(implicit db: Database): Cursor = db.query(table.name, null, s"${col.name} IN (${values.iterator.map(_ => "?").mkString(", ")})", values.map(col(_))(breakOut): Array[String], null, null, null)
+  def findInSet[A](col: Column[A], values: Set[A])(implicit db: Database): Cursor = db.query(table.name, selection = s"${col.name} IN (${values.iterator.map(_ => "?").mkString(", ")})", selectionArgs = values.map(col(_)).toSeq)
 
   def delete[A](col: Column[A], value: A)(implicit db: Database): Int = db.delete(table.name, s"${col.name} = ?", Array(col(value)))
 

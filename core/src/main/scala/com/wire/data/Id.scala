@@ -111,8 +111,16 @@ object AssetId {
   }
 }
 
-case class RAssetId(str: String) extends Id
+case class SyncId(str: String) extends Id
+object SyncId {
+  def apply(): SyncId = SyncIdGen.random()
 
+  implicit object SyncIdGen extends IdGen[SyncId] {
+    override def decode(str: String): SyncId = SyncId(str)
+  }
+}
+
+case class RAssetId(str: String) extends Id
 object RAssetId {
   val Empty = RAssetId("empty")
   def apply(): RAssetId = Id.random()
@@ -123,12 +131,20 @@ object RAssetId {
 }
 
 case class NotifId(str: String) extends Id
-
 object NotifId {
   val Empty = NotifId("empty")
   def apply(): NotifId = Id.random()
 
   implicit object Id extends IdGen[NotifId] {
     override def decode(str: String) = NotifId(str)
+  }
+}
+
+case class TrackingId(str: String) extends Id
+object TrackingId {
+  def apply(): TrackingId = IdGen.random()
+
+  implicit object IdGen extends IdGen[TrackingId] {
+    override def decode(str: String): TrackingId = TrackingId(str)
   }
 }

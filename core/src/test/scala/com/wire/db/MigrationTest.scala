@@ -130,7 +130,7 @@ object OldAccountData {
     val Token          = opt(text[Token]('access_token, JsonEncoder.encodeString[Token], JsonDecoder.decode[Token]))(_.accessToken)
     val UserId         = opt(id[UserId]('user_id)).apply(_.userId)
     val ClientId       = opt(id[ClientId]('client_id))(_.clientId)
-    val ClientRegState = text[ClientRegState.Value]('reg_state, _.toString, ClientRegState.withName)(_.clientRegState)
+    val ClientRegState = text[ClientRegistrationState]('reg_state, _.toString, ClientRegistrationState.withName)(_.clientRegState)
 
     override val idCol = Id
 
