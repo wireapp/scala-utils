@@ -1,40 +1,35 @@
 package com.wire.accounts
 
 
-import com.wire.assets.AssetStorage
-import com.wire.auth.{Credentials, EmailAddress, LoginClient, RegistrationClient}
+import com.wire.accounts.AccountsManager.AccountsFactory
+import com.wire.auth._
 import com.wire.data.AccountId
 import com.wire.logging.ZLog.ImplicitTag._
 import com.wire.logging.ZLog.{debug, info, verbose}
-import com.wire.network.ErrorResponse
+import com.wire.network.{ErrorResponse, ZNetClient}
 import com.wire.network.Response.Status
 import com.wire.otr.{CryptoBoxService, OtrClientsSyncHandler}
 import com.wire.reactive.{EventContext, Signal}
 import com.wire.storage.KeyValueStorage
 import com.wire.sync.SyncServiceHandle
 import com.wire.threading.SerialDispatchQueue
-import com.wire.users.{AccentColor, UserStorage, UsersClient}
+import com.wire.users.{AccentColor, UsersClient}
 
 import scala.collection.mutable
 import scala.concurrent.Future
 
 class AccountsManager(prefs:             KeyValueStorage,
                       val accStorage:    AccountStorage,
-                      val assetsStorage: AssetStorage,
-                      val usersStorage:  UserStorage,
-                      val usersClient:   UsersClient,
-                      val cryptoBox:     CryptoBoxService,
-                      val clientsSync:   OtrClientsSyncHandler,
-                      val sync:          SyncServiceHandle,
+                      val accFactory: AccountsFactory,
                       regClient:         RegistrationClient,
                       val loginClient:   LoginClient) {
 
   import AccountsManager._
   implicit val dispatcher = new SerialDispatchQueue()
 
-  private[waz] implicit val ec = EventContext.Global
+  private[accounts] implicit val ec = EventContext.Global
 
-  private[waz] val accountMap = new mutable.HashMap[AccountId, AccountService]()
+  private[accounts] val accountMap = new mutable.HashMap[AccountId, AccountService]()
 
   val currentAccountPref = prefs.keyValuePref(CurrentAccountPref, Option.empty[AccountId])
 
@@ -48,16 +43,8 @@ class AccountsManager(prefs:             KeyValueStorage,
     case Some(acc) => Signal.future(getInstance(acc) map (Some(_)))
   }
 
-  private[service] def getInstance(account: AccountData) = Future {
+  private def getInstance(account: AccountData) = Future {
     accountMap.getOrElseUpdate(account.id, new AccountService(account, this))
-  }
-
-  def getInstance(id: AccountId): Future[Option[AccountService]] = accStorage.get(id) flatMap {
-    case Some(acc) =>
-      verbose(s"getInstance($acc)")
-      getInstance(acc) map (Some(_))
-    case _ =>
-      Future successful None
   }
 
   def logout() = current.head flatMap {
@@ -191,4 +178,18 @@ class AccountsManager(prefs:             KeyValueStorage,
 
 object AccountsManager {
   val CurrentAccountPref = "CurrentUserPref"
+
+  trait AccountsFactory {
+    def userStorage(accountId: AccountId): StorageModule
+
+    def cryptoBox(accountId: AccountId, storageModule: StorageModule): CryptoBoxService
+
+    def usersClient(zNetClient: ZNetClient): UsersClient
+
+    def znetClient(credentialsHandler: CredentialsHandler): ZNetClient
+
+    def syncServiceHandle: SyncServiceHandle
+
+    def clientsSync: OtrClientsSyncHandler
+  }
 }

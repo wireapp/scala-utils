@@ -40,7 +40,7 @@ case class UserData(id:                    UserId,
                     trackingId:            Option[TrackingId]   = None,
                     picture:               Option[AssetId]      = None,
                     accent:                Int                  = 0, // accent color id
-                    searchKey:             SearchKey,
+                    searchKey:             SearchKey            = SearchKey(""),
                     connection:            ConnectionStatus     = ConnectionStatus.unconnected,
                     connectionLastUpdated: Instant              = Instant.EPOCH, // server side timestamp of last connection update
                     connectionMessage:     Option[String]       = None, // incoming connection request message

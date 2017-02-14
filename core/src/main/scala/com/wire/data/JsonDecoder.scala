@@ -22,7 +22,6 @@ import java.net.URI
 import java.text.SimpleDateFormat
 import java.util.{Date, TimeZone}
 
-import com.waz.model.Handle
 import com.wire.assets.AssetToken
 import com.wire.auth.{EmailAddress, Handle, PhoneNumber}
 import com.wire.cryptography.{AESKey, Sha256}
@@ -139,13 +138,13 @@ object JsonDecoder {
   implicit def decodeOptRConvId(s: Symbol)(implicit js: JSONObject): Option[RConvId] = opt(s, js => RConvId(js.getString(s.name)))
   implicit def decodeOptMessageId(s: Symbol)(implicit js: JSONObject): Option[MessageId] = opt(s, js => MessageId(js.getString(s.name)))
 //  implicit def decodeOptUtcDate(s: Symbol)(implicit js: JSONObject): Option[Date] = opt(s, decodeUtcDate(s)(_))
-//  implicit def decodeOptInstant(s: Symbol)(implicit js: JSONObject): Option[Instant] = opt(s, decodeInstant(s)(_))
+  implicit def decodeOptInstant(s: Symbol)(implicit js: JSONObject): Option[Instant] = opt(s, decodeInstant(s)(_))
   implicit def decodeOptDuration(s: Symbol)(implicit js: JSONObject): Option[Duration] = opt(s, decodeDuration(s)(_))
   implicit def decodeOptURI(s: Symbol)(implicit js: JSONObject): Option[URI] = opt(s, js => new URI(js.getString(s.name)))
 //
-//  implicit def decodeSeq[A](s: Symbol)(implicit js: JSONObject, dec: JsonDecoder[A]): Vector[A] = decodeColl[A, Vector](s)
+  implicit def decodeSeq[A](s: Symbol)(implicit js: JSONObject, dec: JsonDecoder[A]): Vector[A] = decodeColl[A, Vector](s)
 //  implicit def decodeArray[A](s: Symbol)(implicit js: JSONObject, dec: JsonDecoder[A], ct: ClassTag[A]): Array[A] = decodeColl[A, Array](s)
-//  def decodeColl[A, B[_]](s: Symbol)(implicit js: JSONObject, dec: JsonDecoder[A], cbf: CanBuild[A, B[A]]): B[A] = if (js.has(s.name) && !js.isNull(s.name)) arrayColl[A, B](js.getJSONArray(s.name)) else cbf.apply.result
+  def decodeColl[A, B[_]](s: Symbol)(implicit js: JSONObject, dec: JsonDecoder[A], cbf: CanBuild[A, B[A]]): B[A] = if (js.has(s.name) && !js.isNull(s.name)) arrayColl[A, B](js.getJSONArray(s.name)) else cbf.apply.result
 //
   implicit def decodeEmailAddress(s: Symbol)(implicit js: JSONObject): EmailAddress = EmailAddress(js.getString(s.name))
   implicit def decodeOptEmailAddress(s: Symbol)(implicit js: JSONObject): Option[EmailAddress] = opt(s, js => EmailAddress(js.getString(s.name)))

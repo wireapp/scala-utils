@@ -16,12 +16,13 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
-  package com.wire.users
+package com.wire.users
 
 import com.wire.data.UserId
 import com.wire.db.Database
 import com.wire.storage.{CachedStorage, LRUCacheStorage}
 import com.wire.users.UserData.UserDataDao
+import com.wire.logging.ZLog.ImplicitTag._
 
 trait UserStorage extends CachedStorage[UserId, UserData]
 

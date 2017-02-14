@@ -19,6 +19,7 @@ package com.wire.db
 
 import com.wire.auth.{EmailAddress, Handle, PhoneNumber}
 import com.wire.data.{Id, IdGen}
+import org.threeten.bp.Instant
 
 import scala.language.higherKinds
 
@@ -41,16 +42,14 @@ object DbTranslator {
 //    override def save(value: Uid, name: String, values: ContentValues): Unit = values.put(name, value.str)
 //    override def bind(value: Uid, index: Int, stmt: SQLiteProgram): Unit = stmt.bindString(index, value.str)
 //  }
-//  implicit object IntTranslator extends DbTranslator[Int] {
-//    override def load(cursor: Cursor, index: Int): Int = cursor.getInt(index)
-//    override def save(value: Int, name: String, values: ContentValues): Unit = values.put(name, Integer.valueOf(value))
-//    override def bind(value: Int, index: Int, stmt: SQLiteProgram): Unit = stmt.bindLong(index, value)
-//  }
-//  implicit object LongTranslator extends DbTranslator[Long] {
-//    override def load(cursor: Cursor, index: Int): Long = cursor.getLong(index)
-//    override def save(value: Long, name: String, values: ContentValues): Unit = values.put(name, java.lang.Long.valueOf(value))
-//    override def bind(value: Long, index: Int, stmt: SQLiteProgram): Unit = stmt.bindLong(index, value)
-//  }
+  implicit object IntTranslator extends DbTranslator[Int] {
+    override def loadOpt(cursor: Cursor, index: Int) = cursor.getInt(index)
+    override def literal(value: Int) = String.valueOf(value)
+  }
+  implicit object LongTranslator extends DbTranslator[Long] {
+    override def loadOpt(cursor: Cursor, index: Int) = cursor.getLong(index)
+    override def literal(value: Long) = String.valueOf(value)
+  }
 //  implicit object DoubleTranslator extends DbTranslator[Double] {
 //    override def load(cursor: Cursor, index: Int): Double = cursor.getDouble(index)
 //    override def save(value: Double, name: String, values: ContentValues): Unit = values.put(name, java.lang.Double.valueOf(value))
@@ -71,12 +70,10 @@ object DbTranslator {
 //    override def bind(value: Date, index: Int, stmt: SQLiteProgram): Unit = stmt.bindLong(index, value.getTime)
 //    override def literal(value: Date): String = value.getTime.toString
 //  }
-//  implicit object InstantTranslator extends DbTranslator[Instant] {
-//    override def load(cursor: Cursor, index: Int): Instant = Instant.ofEpochMilli(cursor.getLong(index))
-//    override def save(value: Instant, name: String, values: ContentValues): Unit = values.put(name, java.lang.Long.valueOf(value.toEpochMilli))
-//    override def bind(value: Instant, index: Int, stmt: SQLiteProgram): Unit = stmt.bindLong(index, value.toEpochMilli)
-//    override def literal(value: Instant): String = value.toEpochMilli.toString
-//  }
+  implicit object InstantTranslator extends DbTranslator[Instant] {
+    override def loadOpt(cursor: Cursor, index: Int) = cursor.getLong(index).map(Instant.ofEpochMilli)
+    override def literal(value: Instant) = value.toEpochMilli.toString
+  }
 //  implicit object FiniteDurationTranslator extends DbTranslator[FiniteDuration] {
 //    override def load(cursor: Cursor, index: Int): FiniteDuration = FiniteDuration(cursor.getLong(index), TimeUnit.MILLISECONDS)
 //    override def save(value: FiniteDuration, name: String, values: ContentValues): Unit = values.put(name, java.lang.Long.valueOf(value.toMillis))

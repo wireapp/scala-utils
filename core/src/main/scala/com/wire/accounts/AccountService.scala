@@ -4,11 +4,14 @@ import com.wire.accounts.AccountData.ClientRegistrationState
 import com.wire.auth.{Credentials, CredentialsHandler}
 import com.wire.data.AccountId
 import com.wire.logging.ZLog.ImplicitTag._
-import com.wire.logging.ZLog.verbose
+import com.wire.logging.ZLog.{info, verbose}
+import com.wire.macros.returning
 import com.wire.network.AccessTokenProvider.Token
 import com.wire.network.ErrorResponse
 import com.wire.network.Response.Status
 import com.wire.network.ZNetClient.ErrorOrResponse
+import com.wire.otr.Client
+import com.wire.reactive.Signal
 import com.wire.storage.Preference
 import com.wire.threading.{CancellableFuture, Serialized}
 import com.wire.users.UserData
@@ -22,14 +25,74 @@ class AccountService(account: AccountData, manager: AccountsManager) {
 
   private val id = account.id
 
+  private val accountData = manager.accStorage.signal(id)
+
+  lazy val storage: StorageModule = returning(accFactory.userStorage(id)) { storage =>
+
+    account.userId foreach { userId =>
+      // ensure that self user is present on start
+      storage.users.updateOrCreate(userId, identity, UserData(userId, "", account.email, account.phone, connection = UserData.ConnectionStatus.self, handle = account.handle))
+    }
+
+    val selfUserData = accountData.map(_.userId).flatMap {
+      case Some(userId) => storage.users.optSignal(userId)
+      case None => Signal const Option.empty[UserData]
+    }
+
+    // listen to user data changes, update account email/phone if self user data is changed
+    selfUserData.collect {
+      case Some(user) => (user.email, user.phone)
+    } { case (email, phone) =>
+      verbose(s"self user data changed, email: $email, phone: $phone")
+      accStorage.update(id, _.copy(email = email, phone = phone))
+    }
+
+    selfUserData.map(_.exists(_.deleted)) { deleted =>
+      if (deleted) {
+        info(s"self user was deleted, logging out")
+        for {
+          _ <- logoutAndResetClient()
+          _ = accountMap.remove(id)
+          _ <- accStorage.remove(id)
+        // TODO: delete database, account was deleted
+        } yield ()
+      }
+    }
+
+    // listen to client changes, logout and delete cryptobox if current client is removed
+    val otrClient = accountData.map(a => (a.userId, a.clientId)).flatMap {
+      case (Some(userId), Some(cId)) => storage.otrClients.optSignal(userId).map(_.flatMap(_.clients.get(cId)))
+      case _ => Signal const Option.empty[Client]
+    }
+    var hasClient = false
+    otrClient.map(_.isDefined) { exists =>
+      if (hasClient && !exists) {
+        info(s"client has been removed on backend, logging out")
+        logoutAndResetClient()
+      }
+      hasClient = exists
+    }
+  }
+
   lazy val credentialsHandler = new CredentialsHandler {
     override val userId: AccountId = id
     override val cookie: Preference[Option[String]] = Preference[Option[String]](None, accStorage.get(id).map(_.flatMap(_.cookie)), { c => accStorage.update(id, _.copy(cookie = c)) })
     override val accessToken: Preference[Option[Token]] = Preference[Option[Token]](None, accStorage.get(id).map(_.flatMap(_.accessToken)), { token => accStorage.update(id, _.copy(accessToken = token)) })
+
     override def credentials: Credentials = account.credentials
 
     override def onInvalidCredentials(): Unit = logout()
   }
+
+  lazy val userStorage = storage.users
+  lazy val assetsStorage = storage.assets
+
+  lazy val cryptoBox = accFactory.cryptoBox(id, storage)
+  lazy val znetClient = accFactory.znetClient(credentialsHandler)
+  lazy val usersClient = accFactory.usersClient(znetClient)
+  lazy val clientsSync = accFactory.clientsSync
+  lazy val sync = accFactory.syncServiceHandle
+
 
   def login(credentials: Credentials): Future[Either[ErrorResponse, AccountData]] =
     Serialized.future(this) {
@@ -42,7 +105,7 @@ class AccountService(account: AccountData, manager: AccountsManager) {
     manager.logout(id)
   }
 
-  private[service] def ensureFullyRegistered(): Future[Either[ErrorResponse, AccountData]] = {
+  private def ensureFullyRegistered(): Future[Either[ErrorResponse, AccountData]] = {
     verbose(s"ensureFullyRegistered()")
 
     def loadSelfUser(account: AccountData): Future[Either[ErrorResponse, AccountData]] =
@@ -53,7 +116,7 @@ class AccountService(account: AccountData, manager: AccountsManager) {
             verbose(s"got self user info: $userInfo")
             for {
               _ <- assetsStorage.mergeOrCreateAsset(userInfo.mediumPicture)
-              _ <- usersStorage.updateOrCreate(userInfo.id, _.updated(userInfo).copy(syncTimestamp = System.currentTimeMillis()), UserData(userInfo).copy(connection = UserData.ConnectionStatus.self, syncTimestamp = System.currentTimeMillis()))
+              _ <- userStorage.updateOrCreate(userInfo.id, _.updated(userInfo).copy(syncTimestamp = System.currentTimeMillis()), UserData(userInfo).copy(connection = UserData.ConnectionStatus.self, syncTimestamp = System.currentTimeMillis()))
               res <- accStorage.updateOrCreate(id, _.updated(userInfo), account.updated(userInfo))
             } yield Right(res)
           case Left(err) =>
@@ -88,7 +151,9 @@ class AccountService(account: AccountData, manager: AccountsManager) {
                     // we should merge those accounts, delete current one, and switch to the previous one
                     ensureClientRegistered(acc2) flatMap {
                       case Right(acc3) =>
-                        accStorage.updateOrCreate(id, _.updated(acc3.userId, acc3.activated, acc3.clientId, acc3.clientRegState), acc3) map { Right(_) }
+                        accStorage.updateOrCreate(id, _.updated(acc3.userId, acc3.activated, acc3.clientId, acc3.clientRegState), acc3) map {
+                          Right(_)
+                        }
                       case Left(err) => Future successful Left(err)
                     }
                   case Left(err) => Future successful Left(err)
@@ -100,7 +165,7 @@ class AccountService(account: AccountData, manager: AccountsManager) {
     }
   }
 
-  private def ensureClientRegistered(account: AccountData): Future[Either[ErrorResponse, AccountData]] =
+  private def ensureClientRegistered(account: AccountData): Future[Either[ErrorResponse, AccountData]] = {
     import ClientRegistrationState._
     if (account.clientId.isDefined) Future successful Right(account)
     else {
@@ -115,6 +180,7 @@ class AccountService(account: AccountData, manager: AccountsManager) {
           Left(err)
       }
     }
+  }
 
 
   private def activate(account: AccountData): ErrorOrResponse[AccountData] =
@@ -135,5 +201,11 @@ class AccountService(account: AccountData, manager: AccountsManager) {
         CancellableFuture successful Left(err)
     }
 
+  private def logoutAndResetClient() =
+    for {
+      _ <- logout()
+      _ <- cryptoBox.deleteCryptoBox()
+      _ <- accStorage.update(id, _.copy(clientId = None, clientRegState = ClientRegistrationState.Unknown))
+    } yield ()
 
 }

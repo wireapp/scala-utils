@@ -23,11 +23,9 @@ import com.wire.assets.AssetMetaData.Image
 import com.wire.assets.AssetStatus.UploadDone
 import com.wire.data.{AssetId, Mime}
 import com.wire.db.Database
-import com.wire.storage.{CachedStorage, LRUCacheStorage}
 import com.wire.logging.ZLog.ImplicitTag._
 import com.wire.reactive.EventStream
-import com.wire.threading.SerialDispatchQueue
-
+import com.wire.storage.{CachedStorage, LRUCacheStorage}
 import com.wire.utils.RichFutureOpt
 
 import scala.concurrent.Future
@@ -42,8 +40,6 @@ trait AssetStorage extends CachedStorage[AssetId, AssetData] {
 
 class DefaultAssetStorage(db: Database) extends LRUCacheStorage[AssetId, AssetData](100, AssetDataDao, db) with AssetStorage {
   override def getAsset(id: AssetId) = ???
-
-  private implicit val dispatcher = new SerialDispatchQueue()
 
   val onUploadFailed = EventStream[AssetData]()
 

@@ -1,9 +1,12 @@
 package com.wire.otr
 
-import com.wire.data.{ClientId, JsonDecoder, JsonEncoder}
+import com.wire.data.{ClientId, JsonDecoder, JsonEncoder, UserId}
+import com.wire.db.{Cursor, Dao, Database}
 import com.wire.otr.Client.{Location, OtrClientType, Verification}
 import org.json.JSONObject
 import org.threeten.bp.Instant
+
+import scala.collection.breakOut
 
 /**
   * Otr client registered on backend, either our own or from other user.
@@ -102,4 +105,39 @@ object Client {
     val phone, tablet, desktop = Value
   }
   type OtrClientType = OtrClientType.Value
+}
+
+case class UserClients(user: UserId, clients: Map[ClientId, Client]) {
+  def -(clientId: ClientId) = UserClients(user, clients - clientId)
+}
+
+object UserClients {
+
+  implicit lazy val Encoder: JsonEncoder[UserClients] = new JsonEncoder[UserClients] {
+    override def apply(v: UserClients): JSONObject = JsonEncoder { o =>
+      o.put("user", v.user.str)
+      o.put("clients", JsonEncoder.arr(v.clients.values.toSeq))
+    }
+  }
+
+  implicit lazy val Decoder: JsonDecoder[UserClients] = new JsonDecoder[UserClients] {
+    import JsonDecoder._
+    override def apply(implicit js: JSONObject): UserClients = new UserClients(decodeId[UserId]('user), decodeSeq[Client]('clients).map(c => c.id -> c)(breakOut))
+  }
+
+
+  implicit object UserClientsDao extends Dao[UserClients, UserId] {
+    import com.wire.db.Col._
+    val Id = id[UserId]('_id, "PRIMARY KEY").apply(_.user)
+    val Data = text('data)(JsonEncoder.encodeString(_))
+
+    override val idCol = Id
+    override val table = Table("Clients", Id, Data)
+
+    override def apply(implicit cursor: Cursor): UserClients = JsonDecoder.decode(Data)(Decoder)
+
+    def find(ids: Traversable[UserId])(implicit db: Database): Vector[UserClients] =
+      if (ids.isEmpty) Vector.empty
+      else list(db.query(table.name, null, s"${Id.name} in (${ids.map(_.str).mkString("'", "','", "'")})", null, null, null, null))
+  }
 }
