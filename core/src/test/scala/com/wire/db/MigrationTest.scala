@@ -20,9 +20,7 @@ class MigrationTest extends FullFeatureSpec {
 
 
 
-    val db: Database = new SQLiteDatabase(new File("core/src/test/resources/database.db")) {
-
-      override val daos = Seq(OldAccountDataDao)
+    val db: Database = new SQLiteDatabase(new File("core/src/test/resources/database.db"), Seq(OldAccountDataDao)) {
 
       override val migrations = Seq(
         Migration(1, 2) { db =>

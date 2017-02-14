@@ -48,8 +48,12 @@ class AccountsManager(prefs:             KeyValueStorage,
   }
 
   def logout() = current.head flatMap {
-    case Some(account) => account.logout()
-    case None => Future.successful(())
+    case Some(account) =>
+      verbose(s"Logging out of account: ${account.id}")
+      account.logout()
+    case None =>
+      verbose("Not logged in to any account")
+      Future.successful(())
   }
 
   def logout(account: AccountId) = currentAccountPref() flatMap {
@@ -186,7 +190,7 @@ object AccountsManager {
 
     def usersClient(zNetClient: ZNetClient): UsersClient
 
-    def znetClient(credentialsHandler: CredentialsHandler): ZNetClient
+    def zNetClient(credentialsHandler: CredentialsHandler): ZNetClient
 
     def syncServiceHandle: SyncServiceHandle
 

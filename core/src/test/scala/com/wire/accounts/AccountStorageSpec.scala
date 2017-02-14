@@ -13,9 +13,7 @@ class AccountStorageSpec extends FullFeatureSpec {
   scenario("Add some account") {
 
 
-    val db: Database = new SQLiteDatabase(new File("core/src/test/resources/database.db")) {
-      override val daos = Seq(AccountDataDao)
-    }
+    val db: Database = new SQLiteDatabase(new File("core/src/test/resources/global/database.db"), Seq(AccountDataDao))
 
     db.dropAllTables()
 

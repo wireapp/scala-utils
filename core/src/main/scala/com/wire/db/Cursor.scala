@@ -17,7 +17,8 @@ case class Cursor(st: Statement, resultSet: ResultSet) extends AutoCloseable {
     st.getConnection.close()
   }
 
-  def moveToFirst() = resultSet.first()
+//  http://stackoverflow.com/questions/1813858/jdbc-driver-throws-resultset-closed-exception-on-empty-resultset
+  def moveToFirst() = resultSet.next()
 
   def moveToNext() = resultSet.next()
 

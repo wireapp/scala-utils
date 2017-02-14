@@ -19,10 +19,11 @@
 package com.wire.storage
 
 import com.wire.db.{Cursor, Dao, Database}
+import com.wire.logging.ZLog.ImplicitTag._
+import com.wire.logging.ZLog.verbose
 import com.wire.storage.KeyValueData.KeyValueDataDao
 import com.wire.storage.KeyValueStorage.KeyValuePref
 import com.wire.storage.Preference.PrefCodec
-import com.wire.logging.ZLog.ImplicitTag._
 
 import scala.concurrent.{ExecutionContext, Future}
 
@@ -40,6 +41,8 @@ trait KeyValueStorage extends CachedStorage[String, KeyValueData] {
 object KeyValueStorage {
 
   class KeyValuePref[A](storage: KeyValueStorage, key: String, val default: A)(implicit val trans: PrefCodec[A], implicit val dispatcher: ExecutionContext) extends Preference[A] {
+    verbose(s"Building new KVPref: $key, def: $default")
+
     def apply(): Future[A] = storage.decodePref(key, trans.decode).map(_.getOrElse(default))
 
     def :=(value: A): Future[Unit] = storage.setPref(key, trans.encode(value)).map { _ => signal ! value }

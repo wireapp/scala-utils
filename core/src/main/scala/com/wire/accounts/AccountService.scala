@@ -23,7 +23,7 @@ class AccountService(account: AccountData, manager: AccountsManager) {
 
   import manager._
 
-  private val id = account.id
+  private[accounts] val id = account.id
 
   private val accountData = manager.accStorage.signal(id)
 
@@ -88,7 +88,7 @@ class AccountService(account: AccountData, manager: AccountsManager) {
   lazy val assetsStorage = storage.assets
 
   lazy val cryptoBox = accFactory.cryptoBox(id, storage)
-  lazy val znetClient = accFactory.znetClient(credentialsHandler)
+  lazy val znetClient = accFactory.zNetClient(credentialsHandler)
   lazy val usersClient = accFactory.usersClient(znetClient)
   lazy val clientsSync = accFactory.clientsSync
   lazy val sync = accFactory.syncServiceHandle

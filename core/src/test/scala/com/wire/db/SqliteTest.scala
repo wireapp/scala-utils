@@ -12,7 +12,7 @@ import scala.concurrent.Await
 
 class SqliteTest extends FullFeatureSpec {
 
-  lazy val db: Database = new SQLiteDatabase(new File("core/src/test/resources/database.db"))
+  lazy val db: Database = new SQLiteDatabase(new File("core/src/test/resources/database.db"), Seq.empty)
 
   private def resetTable() = {
     db.execSQL(

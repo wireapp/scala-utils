@@ -66,15 +66,21 @@ trait Database {
   def onUpgrade(from: Int, to: Int) = new Migrations(migrations: _*).migrate(this, from, to)
 }
 
-class SQLiteDatabase(dbFile: File) extends Database {
+class SQLiteDatabase(dbFile: File, override val daos: Seq[BaseDao[_]]) extends Database {
 
   //TODO handle multiple threads/connections at some point
   lazy val dispatcher = new SerialDispatchQueue(Threading.IO)
 
   new File(dbFile.getParent).mkdirs()
-  dbFile.createNewFile()
+  if (dbFile.createNewFile()) {
+    verbose("DB file did not exist - performing onCreate")
+    onCreate()
+  }
 
-  override def execSQL(sql: String) = Managed(connection).acquire(_.createStatement().executeUpdate(sql))
+  override def execSQL(sql: String) = {
+    verbose(s"execSQL: $sql")
+    Managed(connection).acquire(_.createStatement().executeUpdate(sql))
+  }
 
   override def query(tableName: String, columns: Set[String], selection: String, selectionArgs: Seq[String],
                      groupBy: String, having: String, orderBy: String, limit: String) = {
@@ -97,6 +103,7 @@ class SQLiteDatabase(dbFile: File) extends Database {
   }
 
   override def withStatement[A](sql: String)(body: PreparedStatement => A): A = {
+    verbose(s"withStatement: $sql")
     Managed(connection).acquire { c =>
       Managed(c.prepareStatement(sql)).acquire(body)
     }

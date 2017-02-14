@@ -4,6 +4,7 @@ import java.io.File
 
 import com.wire.accounts.AccountData.{AccountDataDao, ClientRegistrationState}
 import com.wire.accounts.AccountsManager.AccountsFactory
+import com.wire.assets.AssetData.AssetDataDao
 import com.wire.assets.DefaultAssetStorage
 import com.wire.auth.Credentials.EmailCredentials
 import com.wire.auth._
@@ -11,15 +12,18 @@ import com.wire.config.BackendConfig
 import com.wire.data.{AccountId, ClientId, SyncId, UserId}
 import com.wire.db.{Database, SQLiteDatabase}
 import com.wire.network.{ApacheHTTPAsyncClient, DefaultZNetClient, ZNetClient}
+import com.wire.otr.UserClients.UserClientsDao
 import com.wire.otr._
 import com.wire.storage.DefaultKVStorage
 import com.wire.storage.KeyValueData.KeyValueDataDao
 import com.wire.sync.{SyncResult, SyncServiceHandle}
 import com.wire.testutils.FullFeatureSpec
 import com.wire.threading.{CancellableFuture, Threading}
-import com.wire.users.{DefaultUserStorage, UserInfo, UsersClient}
+import com.wire.users.UserData.UserDataDao
+import com.wire.users.{DefaultUserStorage, DefaultUsersClient, UserInfo, UsersClient}
 
-import scala.concurrent.Future
+import scala.concurrent.duration._
+import scala.concurrent.{Await, Future}
 
 class LoginSpec extends FullFeatureSpec {
 
@@ -28,13 +32,7 @@ class LoginSpec extends FullFeatureSpec {
 
     implicit val ex = Threading.Background
 
-    val db: Database = new SQLiteDatabase(new File("core/src/test/resources/global.db")) {
-      override val daos = Seq(AccountDataDao, KeyValueDataDao)
-    }
-
-//    db.dropAllTables()
-//    db.onCreate()
-
+    val db: Database = new SQLiteDatabase(new File("core/src/test/resources/databases/global.db"), Seq(AccountDataDao, KeyValueDataDao))
     val prefs = new DefaultKVStorage(db)
     val accStorage = new AccountStorage(db)
 
@@ -44,18 +42,15 @@ class LoginSpec extends FullFeatureSpec {
 
     val accountsManager = new AccountsManager(prefs, accStorage,
       new AccountsFactory {
-      override def znetClient(credentialsHandler: CredentialsHandler) = new DefaultZNetClient(credentialsHandler, asyncClient, BackendConfig.StagingBackend, loginClient)
+      override def zNetClient(credentialsHandler: CredentialsHandler) = new DefaultZNetClient(credentialsHandler, asyncClient, BackendConfig.StagingBackend, loginClient)
 
       override def userStorage(accountId: AccountId) = new StorageModule {
 
-        override lazy val db = new SQLiteDatabase(new File(s"core/src/test/resources/${accountId.str}.db"))
+        override lazy val db = new SQLiteDatabase(new File(s"core/src/test/resources/databases/${accountId.str}.db"), Seq(UserDataDao, AssetDataDao, KeyValueDataDao, UserClientsDao))
 
         override lazy val users = new DefaultUserStorage(db)
-
         override lazy val assets = new DefaultAssetStorage(db)
-
         override lazy val keyValues = new DefaultKVStorage(db)
-
         override lazy val otrClients = new DefaultOtrClientStorage(db)
       }
 
@@ -72,12 +67,7 @@ class LoginSpec extends FullFeatureSpec {
         }
       }
 
-      override def usersClient(zNetClient: ZNetClient) = new UsersClient {
-        override def loadSelf() = {
-          println("loadSelf called")
-          CancellableFuture(Right(UserInfo(UserId())))
-        }
-      }
+      override def usersClient(zNetClient: ZNetClient) = new DefaultUsersClient(zNetClient)
 
       override def syncServiceHandle = new SyncServiceHandle {
         override def syncSelfClients() = Future(SyncId())
@@ -101,9 +91,9 @@ class LoginSpec extends FullFeatureSpec {
       override def requestVerificationEmail(email: EmailAddress) = ???
     }, loginClient)
 
-    accountsManager.login(EmailCredentials(Some(EmailAddress("dean+2@wire.com")), Some("aqa123456")))
+    val res = Await.result(accountsManager.login(EmailCredentials(Some(EmailAddress("dean+2@wire.com")), Some("aqa123456"))), 5.seconds)
 
+    println(res)
 
-    Thread.sleep(5000)
   }
 }

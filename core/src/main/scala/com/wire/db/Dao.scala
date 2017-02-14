@@ -17,15 +17,13 @@
  */
 package com.wire.db
 
-import java.sql.ResultSet
-
 import com.wire.data.Managed
 import com.wire.db.Database.ContentValues
-import com.wire.logging.ZLog._
 import com.wire.logging.ZLog.ImplicitTag._
+import com.wire.logging.ZLog._
 import com.wire.macros.returning
 
-import scala.collection.{GenTraversableOnce, breakOut}
+import scala.collection.GenTraversableOnce
 import scala.language.implicitConversions
 
 trait Reader[A] {
@@ -124,7 +122,7 @@ abstract class BaseDao[T] extends Reader[T] {
 
   def iterating(c: => Cursor): Managed[Iterator[T]] = Database.iteratingWithReader(this)(c)
 
-  def single(c: Cursor, close: Boolean = true): Option[T] = try { Option(apply(c))} finally { if (close) c.close() }
+  def single(c: Cursor, close: Boolean = true): Option[T] = try { if (c.moveToFirst()) Option(apply(c)) else None } finally { if (close) c.close() }
 
   def list(c: Cursor, close: Boolean = true, filter: T => Boolean = { _ => true }): Vector[T] = try { CursorIterator(c)(this).filter(filter).toVector } finally { if (close) c.close() }
 
