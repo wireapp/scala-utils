@@ -23,5 +23,11 @@ local.properties
 #local databases
 *.db
 
+#Otr files:
+otr/
+
+target/
+
 .idea
+.history
 out/

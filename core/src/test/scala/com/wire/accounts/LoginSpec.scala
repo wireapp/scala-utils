@@ -45,7 +45,7 @@ class LoginSpec extends FullFeatureSpec {
 
     var callCount = 0
 
-    val async = if (false) {
+    val async = if (true) {
 
       val newCookieHeaders = DefaultHeaders(Map(
         "set-cookie" -> s"zuid=$newCookie"
@@ -141,16 +141,8 @@ class LoginSpec extends FullFeatureSpec {
         override def syncSelfClients() = Future(SyncId())
       }
 
-      override def cryptoBox(accountId: AccountId, storageModule: StorageModule) = new CryptoBoxService {
-        override def deleteCryptoBox() = {
-          println("deleting crypto box")
-          Future.successful({})
-        }
-        override def cryptoBox = {
-          println("accessing cryptobox")
-          Future(Some(new CryptoBox {}))
-        }
-      }
+      override def cryptoBox(accountId: AccountId, storageModule: StorageModule) =
+        new DefaultCryptoBoxService(accountId, storageModule.keyValues, new File("core/src/test/resources/otr"))
     },
       new RegistrationClient {
       override def register(id: AccountId, creds: Credentials, name: String, accentId: Option[Int]) = ???
