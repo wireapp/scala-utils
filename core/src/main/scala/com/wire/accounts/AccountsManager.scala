@@ -18,11 +18,11 @@ import com.wire.users.{AccentColor, UsersClient}
 import scala.collection.mutable
 import scala.concurrent.Future
 
-class AccountsManager(prefs:             KeyValueStorage,
-                      val accStorage:    AccountStorage,
-                      val accFactory: AccountsFactory,
-                      regClient:         RegistrationClient,
-                      val loginClient:   LoginClient) {
+class AccountsManager(val prefs:       KeyValueStorage,
+                      val accStorage:  AccountStorage,
+                      val accFactory:  AccountsFactory,
+                      regClient:       RegistrationClient,
+                      val loginClient: LoginClient) {
 
   import AccountsManager._
   implicit val dispatcher = new SerialDispatchQueue()
@@ -33,18 +33,34 @@ class AccountsManager(prefs:             KeyValueStorage,
 
   val currentAccountPref = prefs.keyValuePref(CurrentAccountPref, Option.empty[AccountId])
 
-  lazy val currentAccountData = currentAccountPref.signal.flatMap[Option[AccountData]] {
-    case None => Signal.const(Option.empty[AccountData])
-    case Some(idStr) => accStorage.optSignal(idStr)
+  val currentAccountData = currentAccountPref.signal.flatMap[Option[AccountData]] { id =>
+    verbose(s"CurrentAccountData updating for id: $id")
+    id match {
+      case None => Signal.const(Option.empty[AccountData])
+      case Some(id) => accStorage.optSignal(id)
+    }
   }
 
-  lazy val current = currentAccountData.flatMap[Option[AccountService]] {
-    case None      => Signal const None
-    case Some(acc) => Signal.future(getInstance(acc) map (Some(_)))
+  val current = currentAccountData.flatMap[Option[AccountService]] { account =>
+    verbose(s"Current service updating from data: $account")
+    account match {
+      case None => Signal const None
+      case Some(acc) => Signal.future(getInstance(acc) map (Some(_)))
+    }
   }
 
   private def getInstance(account: AccountData) = Future {
     accountMap.getOrElseUpdate(account.id, new AccountService(account, this))
+  }
+
+  def getCurrentAccountInfo = currentAccountPref() flatMap {
+    case None => Future successful None
+    case Some(id) => accStorage.get(id)
+  }
+
+  def getCurrent = getCurrentAccountInfo flatMap {
+    case Some(acc) => getInstance(acc) map (Some(_))
+    case _ => Future successful None
   }
 
   def logout() = current.head flatMap {
@@ -98,10 +114,10 @@ class AccountsManager(prefs:             KeyValueStorage,
       loginClient.login(account.id, normalized).future map {
         case Right((token, c)) =>
           Right(account.updated(normalized).copy(cookie = c, activated = true, accessToken = Some(token)))
-        case Left(error @ ErrorResponse(Status.Forbidden, _, "pending-activation")) =>
+        case Left((_, error @ ErrorResponse(Status.Forbidden, _, "pending-activation"))) =>
           verbose(s"account pending activation: $normalized, $error")
           Right(account.updated(normalized).copy(activated = false, cookie = None, accessToken = None))
-        case Left(error) =>
+        case Left((_, error)) =>
           verbose(s"login failed: $error")
           Left(error)
       }
@@ -151,7 +167,7 @@ class AccountsManager(prefs:             KeyValueStorage,
         case Right((userInfo, cookie)) =>
           verbose(s"register($credentials) done, id: $accountId, user: $userInfo, cookie: $cookie")
           for {
-            acc     <- accStorage.insert(AccountData(accountId, normalized).copy(cookie = cookie, userId = Some(userInfo.id), activated = normalized.autoLoginOnRegistration))
+            acc     <- accStorage.insert(AccountData(accountId, normalized).copy(cookie = Some(cookie), userId = Some(userInfo.id), activated = normalized.autoLoginOnRegistration))
             _       = verbose(s"created account: $acc")
             service <- getInstance(acc)
             _       <- setAccount(Some(accountId))

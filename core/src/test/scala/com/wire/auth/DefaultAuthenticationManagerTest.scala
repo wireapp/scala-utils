@@ -1,5 +1,6 @@
 package com.wire.auth
 
+import com.wire.auth.AuthenticationManager.Cookie
 import com.wire.auth.Credentials.EmailCredentials
 import com.wire.config.BackendConfig
 import com.wire.data.AccountId
@@ -59,7 +60,7 @@ class DefaultAuthenticationManagerTest extends FullFeatureSpec {
       private implicit val dispatcher = new SerialDispatchQueue()("DatabaseQueue")
 
       override val accessToken = Preference[Option[Token]](None, MockStorage.getToken, MockStorage.setToken)
-      override val cookie      = Preference[Option[String]](None, MockStorage.getCookie, MockStorage.setCookie)
+      override val cookie      = Preference[Option[Cookie]](None, MockStorage.getCookie, MockStorage.setCookie)
       override val userId      = AccountId("account123")
     })
 
@@ -81,7 +82,7 @@ class DefaultAuthenticationManagerTest extends FullFeatureSpec {
     private implicit val dispatcher = new SerialDispatchQueue()("StorageQueue")
 
     private var savedToken = Option(Token("token0", "token", Instant.now  + 10.seconds))
-    private var savedCookie = Option("cookie0")
+    private var savedCookie = Option(Cookie("cookie0"))
 
     private def delay[A](f: => A) = Future {
       Thread.sleep(200)
@@ -92,7 +93,7 @@ class DefaultAuthenticationManagerTest extends FullFeatureSpec {
     def getCookie = delay(savedCookie)
 
     def setToken(token: Option[Token]) = delay(savedToken = token)
-    def setCookie(cookie: Option[String]) = delay(savedCookie = cookie)
+    def setCookie(cookie: Option[Cookie]) = delay(savedCookie = cookie)
 
   }
 

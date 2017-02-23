@@ -49,10 +49,6 @@ class UnlimitedDispatchQueue(executor: ExecutionContext = Threading.ThreadPool)
   override def execute(runnable: Runnable): Unit = executor.execute(DispatchQueueStats(tag, runnable))
 }
 
-abstract class UiDispatchQueue() extends DispatchQueue {
-  override private[threading] val name: String = "UiDispatchQueue"
-}
-
 /**
   * Execution context limiting number of concurrently executing tasks.
   * All tasks are executed on parent execution context.
@@ -114,5 +110,5 @@ object LimitedDispatchQueue {
 }
 
 
-class SerialDispatchQueue(executor: ExecutionContext = Threading.ThreadPool)
+class SerialDispatchQueue(val executor: ExecutionContext = Threading.ThreadPool)
                          (implicit override val name: LogTag) extends LimitedDispatchQueue(1, executor)

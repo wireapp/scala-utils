@@ -10,14 +10,13 @@ import com.wire.logging.ZLog._
 import com.wire.logging.ZLog.ImplicitTag._
 import com.wire.network.AccessTokenProvider.Token
 import com.wire.network.ContentEncoder.{EmptyRequestContent, JsonContentEncoder}
-import com.wire.network.Response.{Status, SuccessHttpStatus}
+import com.wire.network.Response.{EmptyHeaders, Status, SuccessHttpStatus}
 import com.wire.network._
 import com.wire.threading.CancellableFuture.CancelException
 import com.wire.threading.{CancellableFuture, SerialDispatchQueue}
 import com.wire.utils.{ExponentialBackoff, RichUri}
 import org.json.JSONObject
 import org.threeten.bp.Instant
-
 import com.wire.utils.RichInstant
 
 import scala.concurrent.duration._
@@ -27,7 +26,7 @@ trait LoginClient {
 
   def login(accountId: AccountId, credentials: Credentials): CancellableFuture[LoginResult]
 
-  def access(cookie: Option[String], token: Option[Token]): CancellableFuture[LoginResult]
+  def access(cookie: Cookie, token: Option[Token]): CancellableFuture[LoginResult]
 
 }
 
@@ -39,7 +38,7 @@ class DefaultLoginClient(client: AsyncClient, backend: BackendConfig) extends Lo
   private var lastRequestTime = 0L
   private var failedAttempts = 0
   private var lastResponse = Status.Success
-  private var loginFuture = CancellableFuture.successful[LoginResult](Left(ErrorResponse.Cancelled))
+  private var loginFuture = CancellableFuture.successful[LoginResult](Left((None, ErrorResponse.Cancelled)))
 
   def requestDelay =
     if (failedAttempts == 0) Duration.Zero
@@ -54,7 +53,7 @@ class DefaultLoginClient(client: AsyncClient, backend: BackendConfig) extends Lo
     throttled(loginNow(accountId, credentials))
   }
 
-  override def access(cookie: Option[String], token: Option[Token]) = throttled(accessNow(cookie, token))
+  override def access(cookie: Cookie, token: Option[Token]) = throttled(accessNow(cookie, token))
 
   def throttled(request: => CancellableFuture[LoginResult]): CancellableFuture[LoginResult] = dispatcher {
     loginFuture = loginFuture.recover {
@@ -65,20 +64,20 @@ class DefaultLoginClient(client: AsyncClient, backend: BackendConfig) extends Lo
     } flatMap { _ =>
       info(s"throttling, delay: $requestDelay")
       CancellableFuture.delay(requestDelay)
-                  } flatMap { _ =>
+    } flatMap { _ =>
       info(s"starting request")
       lastRequestTime = System.currentTimeMillis()
       request map {
-        case Left(error) =>
+        case Left((rId, error)) =>
           failedAttempts += 1
           lastResponse = error.getCode
-          Left(error)
+          Left((rId, error))
         case resp =>
           failedAttempts = 0
           lastResponse = Status.Success
           resp
       }
-                  }
+    }
     loginFuture
   }.flatten
 
@@ -86,8 +85,9 @@ class DefaultLoginClient(client: AsyncClient, backend: BackendConfig) extends Lo
     info(s"trying to login: $credentials")
     client(loginUri, Request.PostMethod, loginRequestBody(userId, credentials), timeout = timeout).map(responseHandler)
   }
-  def accessNow(cookie: Option[String], token: Option[Token]) = {
-    val headers = token.fold(Request.EmptyHeaders)(_.headers) ++ cookie.fold(Request.EmptyHeaders)(c => Map(Cookie -> s"zuid=$c"))
+
+  def accessNow(cookie: Cookie, token: Option[Token]) = {
+    val headers = token.fold(Request.EmptyHeaders)(_.headers) ++ cookie.headers
     info(s"accessNow with headers: $headers")
     client(accessUri, Request.PostMethod, EmptyRequestContent, headers, timeout = timeout).map(responseHandler)
   }
@@ -108,12 +108,12 @@ class DefaultLoginClient(client: AsyncClient, backend: BackendConfig) extends Lo
     case Response(SuccessHttpStatus(), responseHeaders, JsonObjectResponse(TokenResponse(token, exp, ttype))) =>
       info(s"receivedAccessToken: '$token', headers: $responseHeaders")
       Right((Token(token, ttype, Instant.now + exp.seconds), getCookieFromHeaders(responseHeaders)))
-    case r @ Response(status, _, ErrorResponse(code, msg, label)) =>
+    case r @ Response(status, headers, ErrorResponse(code, msg, label)) =>
       warn(s"failed login attempt: $r")
-      Left(ErrorResponse(code, msg, label))
-    case r @ Response(status, _, _) =>
+      Left((headers(RequestId), ErrorResponse(code, msg, label)))
+    case r @ Response(status, headers, _) =>
       warn("Unexpected login response")
-      Left(ErrorResponse(status.status, s"unexpected login response: $r", ""))
+      Left((headers(RequestId), ErrorResponse(status.status, s"unexpected login response: $r", "")))
   }
 
   protected val loginUri = new URI(s"${backend.baseUrl}$LoginPath").appendQuery("persist", "true")
@@ -123,7 +123,7 @@ class DefaultLoginClient(client: AsyncClient, backend: BackendConfig) extends Lo
 
 object LoginClient {
 
-  type LoginResult = Either[ErrorResponse, (Token, Cookie)]
+  type LoginResult = Either[(Option[String], ErrorResponse), (Token, Option[Cookie])]
   type AccessToken = (String, Int, String)
 
   val timeout = 15.seconds
@@ -135,6 +135,9 @@ object LoginClient {
   val AccessPath = "/access"
   val ActivateSendPath = "/activate/send"
 
+  //TODO remove once logout issue is fixed: https://wearezeta.atlassian.net/browse/AN-4816
+  val RequestId = "Request-Id"
+
   val Throttling = new ExponentialBackoff(1000.millis, 10.seconds)
 
   def loginRequestBody(user: AccountId, credentials: Credentials) = JsonContentEncoder(JsonEncoder { o =>
@@ -143,10 +146,10 @@ object LoginClient {
     credentials.password.foreach(v => o.put("password", v))
   })
 
-  def getCookieFromHeaders(headers: Response.Headers): Cookie = headers(SetCookie) flatMap {
+  def getCookieFromHeaders(headers: Response.Headers): Option[Cookie] = headers(SetCookie) flatMap {
     case header @ CookieHeader(cookie) =>
-      info(s"parsed cookie from header: $header, cookie: $cookie")
-      Some(cookie)
+      verbose(s"parsed cookie from header: $header, cookie: $cookie")
+      Some(AuthenticationManager.Cookie(cookie))
     case header =>
       warn(s"Unexpected content for Set-Cookie header: $header")
       None

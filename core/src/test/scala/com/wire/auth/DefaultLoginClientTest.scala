@@ -1,5 +1,6 @@
 package com.wire.auth
 
+import com.wire.auth.AuthenticationManager.Cookie
 import com.wire.config.BackendConfig
 import com.wire.network.AccessTokenProvider.Token
 import com.wire.network.Response.{DefaultHeaders, HttpStatus}
@@ -52,7 +53,7 @@ class DefaultLoginClientTest extends FullFeatureSpec {
     val client = new DefaultLoginClient(mockAync, BackendConfig("https://www.someurl.com"))
 
     Await.ready(client.access(
-      Some("zuid=FrXL_1Up0Zz3WiPO9zGztAZDfJYIgKiVb7Bt0I2CPL0-QsModAL8pAruxewgHb7VA_LQtDZH-u4308ce-H9hAA==.v=1.k=1.d=1491660920.t=u.l=.u=5ab6152b-83eb-45eb-b7ad-83c012efb991.r=942b973e"),
+      Cookie("FrXL_1Up0Zz3WiPO9zGztAZDfJYIgKiVb7Bt0I2CPL0-QsModAL8pAruxewgHb7VA_LQtDZH-u4308ce-H9hAA==.v=1.k=1.d=1491660920.t=u.l=.u=5ab6152b-83eb-45eb-b7ad-83c012efb991.r=942b973e"),
       Some(Token("some token", "my type", Instant.now + 1.second))), 5.seconds)
 
   }

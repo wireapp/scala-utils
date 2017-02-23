@@ -9,7 +9,7 @@ import sun.security.util.Password
 
 trait CredentialsHandler {
   val userId: AccountId
-  val cookie: Preference[Cookie]
+  val cookie: Preference[Option[Cookie]]
   val accessToken: Preference[Option[Token]]
 
   def credentials: Credentials

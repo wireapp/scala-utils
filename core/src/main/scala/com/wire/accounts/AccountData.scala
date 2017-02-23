@@ -3,7 +3,7 @@ package com.wire.accounts
 import com.wire.accounts.AccountData.ClientRegistrationState
 import com.wire.auth.AuthenticationManager.Cookie
 import com.wire.auth.Credentials.{EmailCredentials, PhoneCredentials}
-import com.wire.auth.{Credentials, EmailAddress, Handle, PhoneNumber}
+import com.wire.auth._
 import com.wire.data._
 import com.wire.db.{Cursor, Dao, Database}
 import com.wire.network.AccessTokenProvider.Token
@@ -15,7 +15,7 @@ case class AccountData(id:             AccountId,
                        phone:          Option[PhoneNumber]     = None,
                        handle:         Option[Handle]          = None,
                        activated:      Boolean                 = false,
-                       cookie:         Cookie                  = None,
+                       cookie:         Option[Cookie]          = None,
                        password:       Option[String]          = None,
                        accessToken:    Option[Token]           = None,
                        userId:         Option[UserId]          = None,
@@ -39,7 +39,7 @@ case class AccountData(id:             AccountId,
        | clientId:       $clientId
        | clientRegState: $clientRegState
        | privateMode:    $privateMode
-    """.stripMargin
+    """.stripMargin.replace("\n", " | ")
 
   def authorized(credentials: Credentials) = credentials match {
     case EmailCredentials(Some(e), Some(passwd)) if email.contains(e) && AccountData.computeHash(id, passwd) == hash =>
@@ -100,7 +100,7 @@ object AccountData {
     val Email          = opt(emailAddress('email))(_.email)
     val Hash           = text('hash)(_.hash)
     val Activated      = bool('verified)(_.activated)
-    val Cookie         = opt(text('cookie))(_.cookie)
+    val Cookie         = opt(text[Cookie]('cookie, _.str, AuthenticationManager.Cookie))(_.cookie)
     val Phone          = opt(phoneNumber('phone))(_.phone)
     val Token          = opt(text[Token]('access_token, JsonEncoder.encodeString[Token], JsonDecoder.decode[Token]))(_.accessToken)
     val UserId         = opt(id[UserId]('user_id)).apply(_.userId)

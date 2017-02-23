@@ -19,9 +19,8 @@
 package com.wire.threading
 
 import java.util.Timer
-import java.util.concurrent.{Executor, ExecutorService, Executors}
+import java.util.concurrent.{Executor, ExecutorService, Executors, ThreadFactory}
 
-import com.wire.logging.ZLog.ImplicitTag._
 import com.wire.logging.ZLog._
 
 import scala.concurrent.{ExecutionContext, blocking}
@@ -45,14 +44,11 @@ object Threading {
     override def execute(runnable: Runnable): Unit = service.execute(runnable)
   }
 
-  private var _Ui: Option[UiDispatchQueue] = None //to be set by specific environment
-
-  def setUiDispatchQueue(uiDispatchQueue: UiDispatchQueue) = {
-    if (_Ui.isDefined) warn("Ui thread has already been set by application - will not change")
-    else _Ui = Some(uiDispatchQueue)
-  }
-
-  lazy val Ui = _Ui.getOrElse(throw new IllegalStateException("Application needs to set a UI Dispatch Queue"))
+  val uiThreadName = "UI"
+  val Ui = new SerialDispatchQueue(executionContext(Executors.newSingleThreadExecutor(new ThreadFactory {
+    val uiThreadGroup = new ThreadGroup("ui")
+    override def newThread(r: Runnable) = new Thread(uiThreadGroup, r, uiThreadName)
+  })))("UiDispatchQueue")
 
   /**
     * Thread pool for non-blocking background tasks.
@@ -97,7 +93,7 @@ object Threading {
   //    looper.future.map(new Handler(_))(Background)
   //  }
 
-  //  def assertUiThread(): Unit = if (AssertsEnabled && (Thread.currentThread ne Looper.getMainLooper.getThread)) throw new AssertionError(s"Should be run on Ui thread, but is using: ${Thread.currentThread().getName}")
+  def assertUiThread(): Unit = if (AssertsEnabled && (Thread.currentThread().getName != uiThreadName)) throw new AssertionError(s"Should be run on Ui thread, but is using: ${Thread.currentThread().getName}")
 
-  //  def assertNotUiThread(): Unit = if (AssertsEnabled && (Thread.currentThread eq Looper.getMainLooper.getThread)) throw new AssertionError(s"Should be run on background thread, but is using: ${Thread.currentThread().getName}")
+  def assertNotUiThread(): Unit = if (AssertsEnabled && (Thread.currentThread().getName == uiThreadName)) throw new AssertionError(s"Should be run on background thread, but is using: ${Thread.currentThread().getName}")
 }

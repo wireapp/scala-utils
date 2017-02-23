@@ -1,6 +1,8 @@
 package com.wire.accounts
 
+import com.wire.Lifecycle
 import com.wire.accounts.AccountData.ClientRegistrationState
+import com.wire.auth.AuthenticationManager.Cookie
 import com.wire.auth.{Credentials, CredentialsHandler}
 import com.wire.data.AccountId
 import com.wire.logging.ZLog.ImplicitTag._
@@ -11,21 +13,26 @@ import com.wire.network.ErrorResponse
 import com.wire.network.Response.Status
 import com.wire.network.ZNetClient.ErrorOrResponse
 import com.wire.otr.Client
-import com.wire.reactive.Signal
+import com.wire.reactive.{EventContext, Signal}
 import com.wire.storage.Preference
-import com.wire.threading.{CancellableFuture, Serialized}
+import com.wire.threading.{CancellableFuture, Serialized, Threading}
 import com.wire.users.UserData
+import com.wire.utils.ExponentialBackoff
 
 import scala.concurrent.Future
+import scala.concurrent.duration._
 import scala.util.Right
 
-class AccountService(account: AccountData, manager: AccountsManager) {
+class AccountService(@volatile var account: AccountData, manager: AccountsManager) { self =>
+  import AccountService._
 
   import manager._
 
   private[accounts] val id = account.id
 
   private val accountData = manager.accStorage.signal(id)
+
+  val lifecycle = new Lifecycle()
 
   lazy val storage: StorageModule = returning(accFactory.userStorage(id)) { storage =>
 
@@ -74,12 +81,15 @@ class AccountService(account: AccountData, manager: AccountsManager) {
     }
   }
 
+  @volatile
+  private[accounts] var credentials = Credentials.Empty
+
   lazy val credentialsHandler = new CredentialsHandler {
     override val userId: AccountId = id
-    override val cookie: Preference[Option[String]] = Preference[Option[String]](None, accStorage.get(id).map(_.flatMap(_.cookie)), { c => accStorage.update(id, _.copy(cookie = c)) })
+    override val cookie: Preference[Option[Cookie]] = Preference[Option[Cookie]](None, accStorage.get(id).map(_.flatMap(_.cookie)), { c => accStorage.update(id, _.copy(cookie = c)) })
     override val accessToken: Preference[Option[Token]] = Preference[Option[Token]](None, accStorage.get(id).map(_.flatMap(_.accessToken)), { token => accStorage.update(id, _.copy(accessToken = token)) })
 
-    override def credentials: Credentials = account.credentials
+    override def credentials: Credentials = self.credentials
 
     override def onInvalidCredentials(): Unit = logout()
   }
@@ -93,6 +103,40 @@ class AccountService(account: AccountData, manager: AccountsManager) {
   lazy val clientsSync = accFactory.clientsSync
   lazy val sync = accFactory.syncServiceHandle
 
+  val isLoggedIn = currentAccountPref.signal.map(_.contains(id))
+
+  isLoggedIn.on(Threading.Ui) { lifecycle.setLoggedIn }
+
+  accountData { acc =>
+    verbose(s"acc: $acc")
+    account = acc
+    if (acc.cookie.isDefined) {
+      if (credentials == Credentials.Empty) credentials = acc.credentials
+    }
+  } (EventContext.Global)
+
+  accountData.zip(isLoggedIn) {
+    case (acc, loggedIn) =>
+      verbose(s"accountData: $acc, loggedIn: $loggedIn")
+      if (loggedIn && acc.activated && (acc.userId.isEmpty || acc.clientId.isEmpty)) {
+        verbose(s"account data needs registration: $acc")
+        Serialized.future(self) { ensureFullyRegistered() }
+      }
+  }
+
+  private var awaitActivationFuture = CancellableFuture successful Option.empty[AccountData]
+
+  private val shouldAwaitActivation = lifecycle.uiActive.zip(accStorage.optSignal(id)) map {
+    case (true, Some(acc)) => !acc.activated && acc.password.isDefined
+    case _ => false
+  }
+
+  shouldAwaitActivation.on(dispatcher) {
+    case true   => awaitActivationFuture = awaitActivationFuture.recover { case _: Throwable => () } flatMap { _ => awaitActivation(0) }
+    case false  => awaitActivationFuture.cancel()("stop_await_activate")
+  }
+
+  lifecycle.lifecycleState { state => verbose(s"lifecycle state: $state") }
 
   def login(credentials: Credentials): Future[Either[ErrorResponse, AccountData]] =
     Serialized.future(this) {
@@ -194,9 +238,9 @@ class AccountService(account: AccountData, manager: AccountsManager) {
             acc <- accStorage.updateOrCreate(id, _.copy(activated = true, cookie = cookie, accessToken = Some(token)), account.copy(activated = true, cookie = cookie, accessToken = Some(token)))
           } yield Right(acc)
         }
-      case Left(ErrorResponse(Status.Forbidden, _, "pending-activation")) =>
+      case Left((_, ErrorResponse(Status.Forbidden, _, "pending-activation"))) =>
         CancellableFuture successful Right(account.copy(activated = false))
-      case Left(err) =>
+      case Left((_, err)) =>
         verbose(s"activate failed: $err")
         CancellableFuture successful Left(err)
     }
@@ -208,4 +252,21 @@ class AccountService(account: AccountData, manager: AccountsManager) {
       _ <- accStorage.update(id, _.copy(clientId = None, clientRegState = ClientRegistrationState.Unknown))
     } yield ()
 
+  private def awaitActivation(retry: Int = 0): CancellableFuture[Option[AccountData]] =
+    CancellableFuture lift accStorage.get(id) flatMap {
+      case None => CancellableFuture successful None
+      case Some(data) if data.activated => CancellableFuture successful Some(data)
+      case Some(_) if !lifecycle.isUiActive => CancellableFuture successful None
+      case Some(data) =>
+        activate(data) flatMap {
+          case Right(acc) if acc.activated => CancellableFuture successful Some(acc)
+          case _ =>
+            CancellableFuture.delay(ActivationThrottling.delay(retry)) flatMap { _ => awaitActivation(retry + 1) }
+        }
+    }
+
+}
+
+object AccountService {
+  val ActivationThrottling = new ExponentialBackoff(2.seconds, 15.seconds)
 }

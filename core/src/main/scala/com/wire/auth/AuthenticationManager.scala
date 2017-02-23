@@ -1,6 +1,7 @@
 package com.wire.auth
 
 import com.wire.auth.LoginClient.LoginResult
+import com.wire.data.UserId
 import com.wire.network.AccessTokenProvider.Token
 import com.wire.network.ErrorResponse
 import com.wire.network.Response.{Cancelled, ClientClosed, HttpStatus, Status}
@@ -38,77 +39,52 @@ class DefaultAuthenticationManager(client: LoginClient, user: CredentialsHandler
     */
   private var loginFuture: CancellableFuture[Either[Status, Token]] = CancellableFuture.lift(tokenPref() map { _.fold[Either[Status, Token]](Left(Cancelled))(Right(_)) })
 
-  def currentToken() = tokenPref() flatMap {
-    case Some(token) if !isExpired(token) =>
-      info(s"Non expired token: $token")
-      if (shouldRefresh(token)) performLogin() // schedule login on background and don't care about the result, it's supposed to refresh the access token
-      Future.successful(Right(token))
-    case token =>
-      info(s"Expired or non-existant token: $token")
-      performLogin()
-  }
-
-  def invalidateToken() = tokenPref() .map (_.foreach { token => tokenPref := Some(token.copy(expiresAt = Instant.EPOCH)) })(dispatcher)
-
-  def isExpired(token: Token) = token.expiresAt <= Instant.now
-
-  def close() = dispatcher {
-    closed = true
-    loginFuture.cancel()
-  }
-
-  private def shouldRefresh(token: Token) = token.expiresAt - bgRefreshThreshold <= Instant.now
-
-  /**
-    * Performs login request once the last request is finished, but only if we still need it (ie. we don't have access token already)
-    */
-  private def performLogin(): Future[Either[Status, Token]] = {
-    info(s"performLogin, credentials: ${user.credentials}")
-
+  def currentToken() = {
     loginFuture = loginFuture.recover {
       case ex =>
         warn(s"login failed", ex)
         Left(Cancelled)
     } flatMap { _ =>
       CancellableFuture.lift(tokenPref()) flatMap {
-        case Some(token: Token) if !isExpired(token) =>
-          info(s"Token is not expired, returning $token")
-          if (shouldRefresh(token)) {
-            info("Token will expire soon though - should refresh - dispatching access request in background")
-            dispatchAccessRequest()
-          }
+        case Some(token) if !isExpired(token) =>
+          info(s"Non expired token: $token")
           CancellableFuture.successful(Right(token))
-        case _ => CancellableFuture.lift(user.cookie()) flatMap {
-            case Some(c) =>
-              info(s"Dispatching access request with cookie: $c")
-              dispatchAccessRequest()
-            case None =>
-              info("Dispatching login request - no cookie found")
-              dispatchLoginRequest()
+        case token =>
+          CancellableFuture.lift(user.cookie()) flatMap { cookie =>
+            debug(s"Non existent or expired token: $token, will attempt to refresh with cookie: $cookie")
+            cookie match {
+              case Some(c) =>
+                dispatchRequest(client.access(c, token)) {
+                  case Left((requestId, resp @ ErrorResponse(Status.Forbidden | Status.Unauthorized, message, label))) =>
+                    info(s"access request failed (label: $label, message: $message), will try login request. token: $token, cookie: $cookie, access resp: $resp")
+                    for {
+                      _ <- CancellableFuture.lift(user.cookie := None)
+                      _ <- CancellableFuture.lift(user.accessToken := None)
+                      res <- dispatchLoginRequest()
+                    } yield res
+                }
+              case None =>
+                dispatchLoginRequest()
+            }
           }
       }
-                  }
+    }
     loginFuture.future
   }
 
-  private def dispatchAccessRequest(): CancellableFuture[Either[Status, Token]] =
-    for {
-      token <- CancellableFuture lift user.accessToken()
-      cookie <- CancellableFuture lift user.cookie()
-      res <-
-      dispatchRequest(client.access(cookie, token)) {
-        case Left(resp @ ErrorResponse(Status.Forbidden | Status.Unauthorized, message, label)) =>
-          info(s"access request failed (label: $label, message: $message), will try login request. token: $token, cookie: $cookie, access resp: $resp")
-          user.cookie := None
-          user.accessToken := None
-          dispatchLoginRequest()
-      }
-    } yield res
+  def invalidateToken() = tokenPref().map(_.foreach { token => tokenPref := Some(token.copy(expiresAt = Instant.EPOCH)) })(dispatcher)
+
+  def isExpired(token: Token) = token.expiresAt - bgRefreshThreshold <= Instant.now
+
+  def close() = dispatcher {
+    closed = true
+    loginFuture.cancel()
+  }
 
   private def dispatchLoginRequest(): CancellableFuture[Either[Status, Token]] =
     if (user.credentials.canLogin) {
       dispatchRequest(client.login(user.userId, user.credentials)) {
-        case Left(resp @ ErrorResponse(Status.Forbidden, _, _)) =>
+        case Left((requestId, resp @ ErrorResponse(Status.Forbidden, _, _))) =>
           info(s"login request failed with: $resp")
           user.onInvalidCredentials()
           CancellableFuture.successful(Left(HttpStatus(Status.Unauthorized, s"login request failed with: $resp")))
@@ -123,15 +99,20 @@ class DefaultAuthenticationManager(client: LoginClient, user: CredentialsHandler
     request flatMap handler.orElse {
       case Right((token, cookie)) =>
         info(s"received access token: '$token' and cookie: $cookie")
-        tokenPref := Some(token)
-        cookie.foreach(c => user.cookie := Some(c))
-        CancellableFuture.successful(Right(token))
+
+        CancellableFuture.lift(for {
+          _ <- tokenPref := Some(token)
+          _ <- cookie match {
+            case Some(c) => user.cookie := Some(c)
+            case _ => Future.successful({})
+          }
+        } yield Right(token))
 
       case Left(_) if closed =>
         info("AuthManager is closed")
         CancellableFuture.successful(Left(ClientClosed))
 
-      case Left(err @ ErrorResponse(Cancelled.status, msg, label)) =>
+      case Left((_, err @ ErrorResponse(Cancelled.status, msg, label))) =>
         info(s"request has been cancelled")
         CancellableFuture.successful(Left(HttpStatus(err.code, s"$msg - $label")))
 
@@ -139,8 +120,8 @@ class DefaultAuthenticationManager(client: LoginClient, user: CredentialsHandler
         info(s"Received error from request: $err, will retry")
         dispatchRequest(request, retryCount + 1)(handler)
 
-      case Left(err) =>
-        val msg = s"Login request failed after $retryCount retries, last status: $err"
+      case Left((rId, err)) =>
+        val msg = s"Login request failed after $retryCount retries, last status: $err from request: $rId"
         error(msg)
         CancellableFuture.successful(Left(HttpStatus(err.code, msg)))
     }
@@ -154,5 +135,15 @@ object AuthenticationManager {
 
   type ResponseHandler = PartialFunction[LoginResult, CancellableFuture[Either[Status, Token]]]
 
-  type Cookie = Option[String]
+  case class Cookie(str: String) {
+
+    private val parts = str.split('.').toSet
+    val headers = Map(LoginClient.Cookie -> s"zuid=$str")
+    val expiry = find("d=").map(v => Instant.ofEpochSecond(v.toLong))
+    val userId = find("u=").map(UserId(_))
+    def isValid = expiry.exists(_.isAfter(Instant.now))
+    def find(pref: String) = parts.find(_.contains(pref)).map(_.drop(2))
+
+    override def toString = s"${str.take(10)}, exp: $expiry, userId: $userId"
+  }
 }

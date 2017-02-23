@@ -3,6 +3,7 @@ package com.wire.network
 import java.net.URI
 import java.util.concurrent.TimeUnit
 
+import com.wire.auth.AuthenticationManager.Cookie
 import com.wire.auth.Credentials.EmailCredentials
 import com.wire.auth.{Credentials, CredentialsHandler, DefaultLoginClient, EmailAddress}
 import com.wire.config.BackendConfig
@@ -28,7 +29,7 @@ class ZNetClientSpec extends FullFeatureSpec {
     private implicit val dispatcher = new SerialDispatchQueue()("DatabaseQueue")
 
     override val accessToken = Preference[Option[Token]](None, Future(Some(Token("Token", "Bearer", Instant.now))), _ => Future.successful())
-    override val cookie      = Preference[Option[String]](None, Future(Some("Cookie")), _ => Future.successful())
+    override val cookie      = Preference[Option[Cookie]](None, Future(Some(Cookie("Cookie"))), _ => Future.successful())
     override val userId      = AccountId("77cc30d6-8790-4258-bf04-b2bfdcd9642a")
   }
 

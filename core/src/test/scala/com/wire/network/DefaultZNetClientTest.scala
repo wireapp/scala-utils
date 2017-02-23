@@ -1,12 +1,15 @@
 package com.wire.network
 
-import java.io.{File, PrintWriter}
-import java.util.concurrent.TimeUnit
+import java.io.File
 
+import com.wire.accounts.AccountData.AccountDataDao
+import com.wire.accounts.{AccountData, AccountStorage}
+import com.wire.auth.AuthenticationManager.Cookie
 import com.wire.auth.Credentials.EmailCredentials
-import com.wire.auth.{Credentials, CredentialsHandler, DefaultLoginClient, EmailAddress}
+import com.wire.auth._
 import com.wire.config.BackendConfig
-import com.wire.data.AccountId
+import com.wire.data.{AccountId, UserId}
+import com.wire.db.SQLiteDatabase
 import com.wire.events.EventsClient
 import com.wire.macros.returning
 import com.wire.network.AccessTokenProvider.Token
@@ -18,28 +21,51 @@ import com.wire.utils.RichInstant
 import org.json.JSONObject
 import org.threeten.bp.Instant
 
-import scala.concurrent.duration.{Duration, _}
+import scala.concurrent.duration._
 import scala.concurrent.{Await, Future}
-import scala.util.Try
 
 class DefaultZNetClientTest extends FullFeatureSpec {
 
-  val credentials = new CredentialsHandler {
-    override def credentials = EmailCredentials(Some(EmailAddress("dean+1@wire.com")))
-
-    private implicit val dispatcher = new SerialDispatchQueue()("DatabaseQueue")
-
-    override val accessToken = Preference[Option[Token]](None, MemMockStorage.getToken, MemMockStorage.setToken)
-    override val cookie      = Preference[Option[String]](None, MemMockStorage.getCookie, MemMockStorage.setCookie)
-    override val userId      = AccountId("77cc30d6-8790-4258-bf04-b2bfdcd9642a")
-  }
-
-  val config = BackendConfig.StagingBackend
-
   scenario("ZNetClient test") {
+
+    val oldCookie = "oldCookie"
+    val oldToken = "oldToken"
 
     val newCookie = "newCookie"
     val newToken = "newToken"
+
+    object MemMockStorage {
+      private implicit val dispatcher = new SerialDispatchQueue()("StorageQueue")
+
+      @volatile private var savedToken = Option(Token(oldToken, "Bearer", Instant.now + 10.seconds))
+      @volatile private var savedCookie = Option(Cookie(oldCookie))
+
+      private def delay[A](f: => A) = Future {
+        Thread.sleep(500)
+        f
+      }
+
+      def getToken = Future(savedToken)
+
+      def getCookie = delay(savedCookie)
+
+      def setToken(token: Option[Token]) = delay(savedToken = token)
+
+      def setCookie(cookie: Option[Cookie]) = delay(savedCookie = cookie)
+
+    }
+
+    val credentials = new CredentialsHandler {
+      override def credentials = EmailCredentials(Some(EmailAddress("dean+1@wire.com")))
+
+      private implicit val dispatcher = new SerialDispatchQueue()("DatabaseQueue")
+
+      override val accessToken = Preference[Option[Token]](None, MemMockStorage.getToken, MemMockStorage.setToken)
+      override val cookie = Preference[Option[Cookie]](None, MemMockStorage.getCookie, MemMockStorage.setCookie)
+      override val userId = AccountId("77cc30d6-8790-4258-bf04-b2bfdcd9642a")
+    }
+
+    val config = BackendConfig.StagingBackend
 
     val mockAsync = mock[AsyncClient]
     val newCookieHeaders = DefaultHeaders(Map(
@@ -66,35 +92,48 @@ class DefaultZNetClientTest extends FullFeatureSpec {
       """.stripMargin
     ))
 
+    val emptyNotifications = JsonObjectResponse(new JSONObject(
+      """
+        |{
+        |  "time": "2017-02-14T13:39:45Z",
+        |  "has_more": false,
+        |  "notifications": []
+        |}
+      """.stripMargin
+    ))
+
+    var accessCalled = false
     var callCount = 0
     (mockAsync.apply _)
       .expects(*, *, *, *, *, *, *, *)
       .anyNumberOfTimes()
       .onCall { (uri, method, body, headers, followRedirect, timeout, decoder, downloadProgressCallback)  =>
-        println(s"${callCount + 1}th call made")
+        println(s"${callCount + 1}th call made to endpoint: ${uri.getPath} ${uri.getQuery}")
 
-        val response = callCount match {
-          case 0 => Response(HttpStatus(Response.Status.Success), newCookieHeaders, newTokenBody)
-          case _ =>
-            val token = headers.get("Authorization")
-            val cookie = headers.get("Cookie")
+        def assertTokenAndCookie(token: String, cookie: String) = {
+          println(s"Call made with ${headers.get("Authorization")} and ${headers.get("Cookie")}")
+          assert(headers.get("Authorization").contains(s"Bearer $token") && headers.get("Cookie").forall(_.contains(cookie)), "Incorrect cookie or token")
+        }
 
-            val validToken = token.contains(s"Bearer $newToken")
-            val validCookie = cookie.forall(_ == newCookie)
+        assertTokenAndCookie(if (accessCalled) newToken else oldToken, if (accessCalled) newCookie else oldCookie)
 
-            if (validToken && validCookie) {
-              println("Everything was solid")
-              Response(HttpStatus(Response.Status.Success))
-            } else {
-              if (!validToken) println(s"${callCount + 1}th request had wrong token: $token")
-              if (cookie.isDefined && !validCookie) println(s"${callCount + 1}th incorrect cookie: $cookie")
-              Response(HttpStatus(Response.Status.Forbidden), body = invalidBody)
-            }
+        val response = uri.getPath match {
+          case LoginClient.AccessPath if !accessCalled =>
+            accessCalled = true
+            Response(HttpStatus(Response.Status.Success), newCookieHeaders, newTokenBody)
+          case LoginClient.AccessPath =>
+            println("Unecessary second call to /access....")
+            Response(HttpStatus(Response.Status.Success), Response.EmptyHeaders, newTokenBody)
+          //          case LoginClient.AccessPath =>
+          //            Response(HttpStatus(Response.Status.Unauthorized), Response.EmptyHeaders, EmptyResponse)
+          case EventsClient.NotificationsPath =>
+            Response(HttpStatus(Response.Status.Success), Response.EmptyHeaders, emptyNotifications)
+          case _ => fail(s"Unexpected endpoint called: ${uri.getPath}")
         }
 
         callCount += 1
         CancellableFuture {
-          Thread.sleep(500)
+          Thread.sleep(2000)
           response
         }(new SerialDispatchQueue()("TestAsyncClient"))
       }
@@ -102,85 +141,114 @@ class DefaultZNetClientTest extends FullFeatureSpec {
     val client = new DefaultZNetClient(credentials, mockAsync, config, new DefaultLoginClient(mockAsync, config))
 
     import com.wire.threading.Threading.Implicits.Background
+    println("Triggering test now...")
     val res = Future.sequence(Seq(
+      client.apply(Request.Get(EventsClient.NotificationsPath, EventsClient.notificationsQuery(None, None, 100))).future,
+      client.apply(Request.Get(EventsClient.NotificationsPath, EventsClient.notificationsQuery(None, None, 100))).future,
+      client.apply(Request.Get(EventsClient.NotificationsPath, EventsClient.notificationsQuery(None, None, 100))).future,
+      client.apply(Request.Get(EventsClient.NotificationsPath, EventsClient.notificationsQuery(None, None, 100))).future,
       client.apply(Request.Get(EventsClient.NotificationsPath, EventsClient.notificationsQuery(None, None, 100))).future,
       client.apply(Request.Get(EventsClient.NotificationsPath, EventsClient.notificationsQuery(None, None, 100))).future
     ))
 
-    println(s"result: ${Await.result(res, 10.seconds)}")
+    println(s"result: ${Await.result(res, 1.minute)}")
 
-    println(s"token: ${Await.result(MemMockStorage.getToken, 10.seconds)}")
-    println(s"cookie: ${Await.result(MemMockStorage.getCookie, 10.seconds)}")
-
-    Thread.sleep(20000)
-  }
-
-  object MemMockStorage {
-    private implicit val dispatcher = new SerialDispatchQueue()("StorageQueue")
-
-    private var savedToken = Option(Token("oldToken", "Bearer", Instant.now + 10.seconds))
-    private var savedCookie = Option("oldCookie")
-
-    private def delay[A](f: => A) = Future {
-      Thread.sleep(500)
-      f
-    }
-
-    def getToken = delay(savedToken)
-    def getCookie = delay(savedCookie)
-
-    def setToken(token: Option[Token]) = delay(savedToken = token)
-    def setCookie(cookie: Option[String]) = delay(savedCookie = cookie)
+    println(s"token: ${Await.result(MemMockStorage.getToken, 20.seconds)}")
+    println(s"cookie: ${Await.result(MemMockStorage.getCookie, 20.seconds)}")
 
   }
 
-  object FileMockStorage {
+  scenario("What happens if we call /access even with a valid token/cookie pair?") {
+    //Answer: We get the same access token back and no cookie
 
-    private implicit val dispatcher = new SerialDispatchQueue()("StorageQueue")
+    import com.wire.threading.Threading.Implicits.Background
 
-    private val storageLoc = "resources/user.txt"
+    val dbFile = returning(new File("core/src/test/resources/databases/global.db"))(_.delete())
+    val db = new SQLiteDatabase(dbFile, Seq(AccountDataDao))
 
-    private val cookieFile = returning(new File("core/src/test/resources/cookie.txt"))(_.createNewFile())
-    private val tokenFile = returning(new File("core/src/test/resources/token.txt"))(_.createNewFile())
+    val accStorage = new AccountStorage(db)
 
-    def printToFile(f: File)(op: PrintWriter => Unit) = Future {
-      val p = new PrintWriter(f)
-      try op(p) finally p.close()
+    val account: AccountData = AccountData(AccountId(), Some(EmailAddress("dean+2@wire.com")), password = Some("aqa123456"))
+
+    Await.ready(accStorage.insert(account), 5.seconds)
+
+    val credentialsHandler = new CredentialsHandler {
+      override val userId: AccountId = account.id
+
+      override def credentials: Credentials = EmailCredentials(account.email, account.password)
+
+      override val cookie: Preference[Option[Cookie]] = Preference[Option[Cookie]](None, accStorage.get(userId).map(_.flatMap(_.cookie)), { c => accStorage.update(userId, _.copy(cookie = c)) })
+      override val accessToken: Preference[Option[Token]] = Preference[Option[Token]](None, accStorage.get(userId).map(_.flatMap(_.accessToken)), { token => accStorage.update(userId, _.copy(accessToken = token)) })
+
+      override def onInvalidCredentials(): Unit = println("invalid credentials")
     }
-
-    def getToken = Future(Try(Token.Decoder(new JSONObject(scala.io.Source.fromFile(tokenFile).mkString))).toOption)
-    def getCookie = Future(Try(scala.io.Source.fromFile(cookieFile).mkString).toOption.filter(_.nonEmpty))
-
-    def setToken(token: Option[Token]) = token match {
-      case Some(t) => printToFile(tokenFile) { p => p.print(Token.Encoder(t).toString) }
-      case None => printToFile(tokenFile) {_.print("")}
-    }
-
-    def setCookie(cookie: Option[String]) = cookie match {
-      case Some(c) => printToFile(cookieFile) { p => p.print(c) }
-      case None => printToFile(cookieFile) {_.print("")}
-    }
-
-    def clear = {
-      setToken(None)
-      setCookie(None)
-    }
-  }
-
-  scenario("Test mock storage") {
-    FileMockStorage.setCookie(Some("test cookie: alkdfj"))
-    FileMockStorage.setToken(Some(Token("token", "type", Instant.now)))
-
-    println(Await.result(FileMockStorage.getCookie, 5.seconds))
-    println(Await.result(FileMockStorage.getToken, 5.seconds))
-  }
-
-  scenario("Test with actual backend") { //useful for collecting real-world responses
 
     val async = new ApacheHTTPAsyncClient()
-    val znet = new DefaultZNetClient(credentials, async, config, new DefaultLoginClient(async, config))
+    val login = new DefaultLoginClient(async, BackendConfig.StagingBackend)
+    val auth = new DefaultAuthenticationManager(login, credentialsHandler)
 
-    Await.result(znet(Request.Get(EventsClient.NotificationsPath, EventsClient.notificationsQuery(None, None, 100))).future, 5.seconds)
+    Await.ready(auth.currentToken(), 5.seconds)
+
+    val (cookie, token) = Await.result(for {
+      cookie <- credentialsHandler.cookie()
+      token <- credentialsHandler.accessToken()
+    } yield (cookie, token), 5.seconds)
+
+    println(s"Second token/cookie received: ${Await.result(login.accessNow(cookie.get, token), 5.seconds)}")
+
+  }
+
+  scenario("What's the response for invalid credentials/tokens/cookies to the backend") {
+    //Answer - no token: missing access token/missing token or cookie
+
+    import com.wire.threading.Threading.Implicits.Background
+
+    val dbFile = returning(new File("core/src/test/resources/databases/global.db"))(_ => {})//(_.delete())
+    val db = new SQLiteDatabase(dbFile, Seq(AccountDataDao))
+
+    val accStorage = new AccountStorage(db)
+
+    val account: AccountData = AccountData(AccountId(), Some(EmailAddress("dean+2@wire.com")), password = Some("aqa123456"), activated = true)
+
+    Await.ready(accStorage.insert(account), 5.seconds)
+
+    val credentialsHandler = new CredentialsHandler {
+      override val userId: AccountId = account.id
+
+      override def credentials: Credentials = EmailCredentials(account.email, account.password)
+
+      override val cookie: Preference[Option[Cookie]] = Preference[Option[Cookie]](None, accStorage.get(userId).map(_.flatMap(_.cookie)), { c => accStorage.update(userId, _.copy(cookie = c)) })
+      override val accessToken: Preference[Option[Token]] = Preference[Option[Token]](None, accStorage.get(userId).map(_.flatMap(_.accessToken)), { token => accStorage.update(userId, _.copy(accessToken = token)) })
+
+      override def onInvalidCredentials(): Unit = println("invalid credentials")
+    }
+
+    val async = new ApacheHTTPAsyncClient()
+    val login = new DefaultLoginClient(async, BackendConfig.StagingBackend)
+    val auth = new DefaultAuthenticationManager(login, credentialsHandler)
+
+    Await.ready(auth.currentToken(), 20.seconds)
+
+    val (cookie, token) = Await.result(for {
+      cookie <- credentialsHandler.cookie()
+      token <- credentialsHandler.accessToken()
+    } yield (cookie, token), 5.seconds)
+
+    println(s"Second token/cookie received: ${Await.result(login.accessNow(Cookie("123"), token), 5.seconds)}")
+
+  }
+
+  scenario("Cookie expiry") {
+
+
+    val cookie = Cookie("TPyYf0ZpqW5sNw8pG18fiKATb3LIjoqg4i9coaHXKoPf0mLPOJuKNfAfIY8tEp8-A38yrsl44yh0dUL_ssrtBA==.v=1.k=1.d=1493310228.t=u.l=.u=fffeb02e-38ec-4110-9048-96d5404ddbd1.r=dd6f28e8")
+
+    println(cookie)
+    println(cookie.str)
+    println(cookie.headers)
+    println(cookie.expiry)
+    println(cookie.userId)
+    println(cookie.isValid)
 
   }
 
