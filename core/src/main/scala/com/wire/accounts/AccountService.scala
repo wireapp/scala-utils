@@ -169,6 +169,26 @@ class AccountService(@volatile var account: AccountData, manager: AccountsManage
         }
       }
 
+    def ensureClientRegistered(account: AccountData): Future[Either[ErrorResponse, AccountData]] = {
+      import ClientRegistrationState._
+      if (account.clientId.isDefined) {
+        verbose(s"Client: ${account.clientId} already registered")
+        Future successful Right(account)
+      }
+      else {
+        clientsSync.registerClient(account.password) map {
+          case Right((Registered, Some(cl))) =>
+            Right(account.copy(clientId = Some(cl.id), clientRegState = Registered, activated = true))
+          case Right((state, _)) =>
+            sync.syncSelfClients() // request clients com.wire.sync, UI will need that
+            Right(account.copy(clientRegState = state))
+          case Left(err) =>
+            error(s"client registration failed: $err")
+            Left(err)
+        }
+      }
+    }
+
     def checkCryptoBox =
       cryptoBox.cryptoBox flatMap {
         case Some(cb) => Future successful Some(cb)
@@ -208,24 +228,6 @@ class AccountService(@volatile var account: AccountData, manager: AccountsManage
         }
     }
   }
-
-  private def ensureClientRegistered(account: AccountData): Future[Either[ErrorResponse, AccountData]] = {
-    import ClientRegistrationState._
-    if (account.clientId.isDefined) Future successful Right(account)
-    else {
-      clientsSync.registerClient(account.password) map {
-        case Right((Registered, Some(cl))) =>
-          Right(account.copy(clientId = Some(cl.id), clientRegState = Registered, activated = true))
-        case Right((state, _)) =>
-          sync.syncSelfClients() // request clients com.wire.sync, UI will need that
-          Right(account.copy(clientRegState = state))
-        case Left(err) =>
-          error(s"client registration failed: $err")
-          Left(err)
-      }
-    }
-  }
-
 
   private def activate(account: AccountData): ErrorOrResponse[AccountData] =
     if (account.activated) CancellableFuture successful Right(account)

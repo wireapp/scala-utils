@@ -18,6 +18,8 @@
  */
 package com.wire.data
 
+import java.math.BigInteger
+import java.nio.ByteBuffer
 import java.util.UUID
 
 import scala.util.Random
@@ -45,7 +47,9 @@ object UId {
   }
 }
 
-case class ClientId(str: String) extends Id
+case class ClientId(str: String) extends Id {
+  def longId = new BigInteger(str, 16).longValue()
+}
 object ClientId {
   implicit object ClientIdGen extends IdGen[ClientId] {
     override def random(): ClientId = ClientId(Random.nextLong().toHexString)
@@ -66,7 +70,17 @@ object AccountId {
   }
 }
 
-case class UserId(str: String) extends Id
+case class UserId(str: String) extends Id {
+  def bytes = {
+    val uuid = UUID.fromString(str)
+    val bytes = Array.ofDim[Byte](16)
+    val bb = ByteBuffer.wrap(bytes).asLongBuffer()
+    bb.put(uuid.getMostSignificantBits)
+    bb.put(uuid.getLeastSignificantBits)
+    bytes
+  }
+}
+
 object UserId {
   def apply(): UserId = UserIdGen.random()
 

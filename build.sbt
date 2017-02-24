@@ -32,6 +32,7 @@ lazy val core = (project in file("core"))
       "org.json" % "json" % "20160810",
       "commons-codec" % "commons-codec" % "1.10",
       "com.wire" % "generic-message-proto" % "1.18.0",
+      "com.wire" % "backend-api-proto" % "1.1",
       "org.threeten" % "threetenbp" % "1.3" % Provided,
 //      "org.java-websocket" % "Java-WebSocket" % "1.3.0",
       "javax.websocket" % "javax.websocket-api" % "1.1",
