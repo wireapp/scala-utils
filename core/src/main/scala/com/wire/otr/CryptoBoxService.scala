@@ -34,6 +34,8 @@ trait CryptoBoxService {
 
   def generatePreKeysIfNeeded(remainingKeys: Seq[Int]): Future[Seq[PreKey]]
 
+  lazy val sessions = new CryptoSessionService(this)
+
 }
 
 //TODO fix unmanaged dependency on cryptobox jni

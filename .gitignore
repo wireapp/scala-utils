@@ -24,7 +24,8 @@ local.properties
 *.db
 
 #Otr files:
-otr/
+**/test/resources/otr
+**/test/resources/databases
 
 target/
 
