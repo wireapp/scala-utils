@@ -12,13 +12,16 @@ import com.wire.otr.Client.{Location, OtrClientType, Verification}
 import org.apache.commons.codec.binary.Base64
 import org.json.{JSONArray, JSONObject}
 import org.threeten.bp.Instant
+import com.wire.logging.ZLog.ImplicitTag._
 
 import scala.collection.breakOut
 
 class OtrClient(netClient: ZNetClient) {
   import OtrClient._
 
-  private[waz] val PermanentClient = true // for testing
+  import com.wire.threading.Threading.Implicits.Background
+
+  val PermanentClient = true // for testing
 
   def loadPreKeys(user: UserId): ErrorOrResponse[Seq[ClientKey]] =
     netClient.withErrorHandling(s"loadPreKeys", Request.Get(userPreKeysPath(user))) {

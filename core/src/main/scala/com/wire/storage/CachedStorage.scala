@@ -27,7 +27,7 @@ import com.wire.reactive.{AggregatingSignal, EventStream, Signal}
 import com.wire.threading.SerialDispatchQueue
 import org.apache.commons.collections4.map.LRUMap
 
-import scala.collection._
+import scala.collection.breakOut
 import scala.collection.JavaConverters._
 import scala.collection.generic.CanBuild
 import scala.concurrent.Future
@@ -77,7 +77,7 @@ trait CachedStorage[K, V] {
   //
   //  def list(): Future[Seq[V]]
   //
-  //  def getAll(keys: Traversable[K]): Future[Seq[Option[V]]]
+  def getAll(keys: Traversable[K]): Future[Seq[Option[V]]]
   //
   def update(key: K, updater: V => V): Future[Option[(V, V)]]
   //
@@ -87,9 +87,9 @@ trait CachedStorage[K, V] {
   //
   def updateOrCreate(key: K, updater: V => V, creator: => V): Future[V]
   //
-  //  def updateOrCreateAll(updaters: K Map (Option[V] => V)): Future[Set[V]]
+  def updateOrCreateAll(updaters: K Map (Option[V] => V)): Future[Set[V]]
   //
-  //  def updateOrCreateAll2(keys: Iterable[K], updater: ((K, Option[V]) => V)): Future[Set[V]]
+  def updateOrCreateAll2(keys: Iterable[K], updater: ((K, Option[V]) => V)): Future[Set[V]]
   //
   //  protected def updateInternal(key: K, updater: V => V)(current: V): Future[Option[(V, V)]]
   //
@@ -124,6 +124,65 @@ abstract class LRUCacheStorage[K, V](cacheSize: Int, dao: Dao[V, K], db: Databas
   def remove(key: K): Future[Unit] = Future {
     cache.put(key, None)
     returning(db { delete(Seq(key))(_) }) { _ => onDeleted ! Seq(key) }
+  }
+
+  def updateOrCreateAll(updaters: K Map (Option[V] => V)) =
+    updateOrCreateAll2(updaters.keys.toVector, { (key, v) => updaters(key)(v)})
+
+  def updateOrCreateAll2(keys: Iterable[K], updater: ((K, Option[V]) => V)) =
+    if (keys.isEmpty) Future successful Set.empty[V]
+    else {
+      verbose(s"updateOrCreateAll($keys)")
+      getAll(keys) flatMap { values =>
+        val loaded: Map[K, Option[V]] = keys.iterator.zip(values.iterator).map { case (k, v) => k -> Option(cache.get(k)).flatten.orElse(v) }.toMap
+        val toSave = Vector.newBuilder[V]
+        val added = Vector.newBuilder[V]
+        val updated = Vector.newBuilder[(V, V)]
+
+        val result = keys .map { key =>
+          val current = loaded.get(key).flatten
+          val next = updater(key, current)
+          current match {
+            case Some(c) if c != next =>
+              cache.put(key, Some(next))
+              toSave += next
+              updated += (c -> next)
+            case None =>
+              cache.put(key, Some(next))
+              toSave += next
+              added += next
+            case Some(_) => // unchanged, ignore
+          }
+          next
+        } .toSet
+
+        val addedResult = added.result
+        val updatedResult = updated.result
+
+        returning (db { save(toSave.result)(_) } .map { _ => result }) { _ =>
+          if (addedResult.nonEmpty) onAdded ! addedResult
+          if (updatedResult.nonEmpty) onUpdated ! updatedResult
+        }
+      }
+    }
+
+  def getAll(keys: Traversable[K]) = {
+    val cachedEntries = keys.flatMap { key => Option(cache.get(key)) map { value => (key, value) } }.toMap
+    val missingKeys = keys.toSet -- cachedEntries.keys
+
+    db.read { db => load(missingKeys)(db) } map { loadedEntries =>
+      val loadedMap: Map[K, Option[V]] = loadedEntries.map { value =>
+        val key = dao.idExtractor(value)
+        Option(cache.get(key)).map(m => (key, m)).getOrElse {
+          cache.put(key, Some(value))
+          (key, Some(value))
+        }
+      }(breakOut)
+
+      keys .map { key =>
+        returning(Option(cache.get(key)).orElse(loadedMap.get(key).orElse(cachedEntries.get(key))).getOrElse(None)) { cache.put(key, _) }
+      } (breakOut) : Vector[Option[V]]
+    }
   }
 
   //  protected def load(key: K): Option[V]
@@ -189,6 +248,8 @@ abstract class LRUCacheStorage[K, V](cacheSize: Int, dao: Dao[V, K], db: Databas
   }
 
   private def load(key: K)(implicit db: Database) = dao.getById(key)
+
+  private def load(keys: Set[K])(implicit db: Database) = dao.getAll(keys)
 
   private def save(values: Seq[V])(implicit db: Database) = dao.insertOrReplace(values)
 

@@ -2,9 +2,11 @@ package com.wire.sync
 
 import com.wire.auth.Handle
 import com.wire.data._
+import com.wire.otr.{OtrClient, OtrClientsSyncHandler}
 import com.wire.sync.SyncServiceHandle.Priority
-import com.wire.threading.Threading
+import com.wire.threading.{SerialDispatchQueue, Threading}
 import com.wire.users.UserInfo
+import com.wire.logging.ZLog.ImplicitTag._
 import org.threeten.bp.Instant
 
 import scala.concurrent.Future
@@ -57,6 +59,12 @@ trait SyncServiceHandle {
 //  def postSessionReset(conv: ConvId, user: UserId, client: ClientId): Future[SyncId]
 
 //  def postValidateHandles(handles: Seq[Handle]): Future[SyncId]
+}
+
+class DefaultSyncServiceHandle(otrClients: OtrClientsSyncHandler) extends SyncServiceHandle {
+  implicit val dispatcher = new SerialDispatchQueue()
+  override def syncSelfClients() = otrClients.syncSelfClients().map(_ => SyncId())
+//  override def syncClientsLocation() = otrClients.
 }
 
 object SyncServiceHandle {
