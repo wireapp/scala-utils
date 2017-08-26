@@ -183,7 +183,7 @@ class AccountService(@volatile var account: AccountData, manager: AccountsManage
             sync.syncSelfClients() // request clients com.wire.sync, UI will need that
             Right(account.copy(clientRegState = state))
           case Left(err) =>
-            error(s"client registration failed: $err")
+            sys.error(s"client registration failed: $err")
             Left(err)
         }
       }
