@@ -18,21 +18,27 @@ import java.nio.file.{Files, Path, Paths}
 object JniHandler {
   def prepareNativeLibrariesPath() = {
     val tempDir = Files.createTempDirectory("com.wire.jni.JniHandler_nativeLibs")
+    unsafeAddDirToJavasLibraryPath(tempDir)
     tempDir.toFile.deleteOnExit
 
-    Files.list(Paths.get("core/lib")).forEach(p => {
-      val targetPath = Paths.get(tempDir.toString, p.getFileName.toString);
-      val newTempFile = Files.copy(p, targetPath)
-      newTempFile.toFile.deleteOnExit()
+    val libs = List[String]("cryptobox", "cryptobox-jni", "sodium")
+    libs.foreach(lib => {
+      val libName = System.mapLibraryName(lib)
+      val is = getClass.getClassLoader.getResourceAsStream(libName)
+      val targetFile = Paths.get(tempDir.toAbsolutePath.toString, libName);
+
+      Files.copy(is, targetFile)
+      targetFile.toFile.deleteOnExit()
     })
 
-    unsafeAddDirToJavasLibraryPath(tempDir)
   }
 
   /* Hack to add an addition to java.library.path. For reference see:
-   * http://www.scala-lang.org/old/node/7542.html#comment-31218
-   */
-  private def unsafeAddDirToJavasLibraryPath(path: Path) = try {
+     * http://www.scala-lang.org/old/node/7542.html#comment-31218
+     */
+  private def unsafeAddDirToJavasLibraryPath(path: Path)
+
+  = try {
     val dir = path.toAbsolutePath.toString
     val field = classOf[ClassLoader].getDeclaredField("usr_paths")
     field.setAccessible(true)
