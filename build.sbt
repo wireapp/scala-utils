@@ -13,9 +13,7 @@ licenses in ThisBuild += ("GPL-3.0", url("https://opensource.org/licenses/GPL-3.
 scalacOptions += "-target:jvm-1.7"
 javacOptions ++= Seq("-source", "1.7", "-target", "1.7")
 
-lazy val licenseHeaders = HeaderPlugin.autoImport.headers := Set("scala", "java", "rs").map {
-  _ -> GPLv3("2016", "Wire Swiss GmbH")
-}(collection.breakOut)
+lazy val licenseHeaders = HeaderPlugin.autoImport.headers := Set("scala", "java", "rs") .map { _ -> GPLv3("2016", "Wire Swiss GmbH") } (collection.breakOut)
 
 lazy val scalautils = (project in file("."))
   .enablePlugins(AutomateHeaderPlugin).settings(licenseHeaders)
