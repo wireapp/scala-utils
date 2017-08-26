@@ -2,6 +2,7 @@ package com.wire.otr
 
 import java.io.File
 
+import com.wire.JniHandler
 import com.wire.cryptobox.{CryptoBox, PreKey}
 import com.wire.data.{AccountId, ClientId}
 import com.wire.error.LoggedTry
@@ -38,10 +39,11 @@ trait CryptoBoxService {
 
 }
 
-//TODO fix unmanaged dependency on cryptobox jni
 class DefaultCryptoBoxService(accountId: AccountId, keyValue: KeyValueStorage, targetDir: File) extends CryptoBoxService {
 
   import CryptoBoxService._
+
+  JniHandler.prepareNativeLibrariesPath()
 
   override lazy val cryptoBoxDir = returning(new File(targetDir, accountId.str))(_.mkdirs())
 

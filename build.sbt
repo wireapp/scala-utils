@@ -6,7 +6,7 @@ version := "0.0.1"
 
 logLevel := Level.Debug
 
-scalaVersion in ThisBuild := "2.11.8"
+scalaVersion in ThisBuild := "2.12.3"
 
 licenses in ThisBuild += ("GPL-3.0", url("https://opensource.org/licenses/GPL-3.0"))
 
@@ -26,15 +26,15 @@ lazy val core = (project in file("core"))
   .enablePlugins(AutomateHeaderPlugin).settings(licenseHeaders)
   .dependsOn(macrosupport)
   .settings(
+    resolvers += "Wire Maven Repository" at "https://dl.bintray.com/wire-android/releases/",
     libraryDependencies ++= Seq(
       "ch.qos.logback" % "logback-classic" % "1.1.7",
-      "com.typesafe.scala-logging" %% "scala-logging" % "3.4.0",
+      "com.typesafe.scala-logging" %% "scala-logging" % "3.5.0",
       "org.json" % "json" % "20160810",
       "commons-codec" % "commons-codec" % "1.10",
       "com.wire" % "generic-message-proto" % "1.18.0",
       "com.wire" % "backend-api-proto" % "1.1",
       "org.threeten" % "threetenbp" % "1.3" % Provided,
-//      "org.java-websocket" % "Java-WebSocket" % "1.3.0",
       "javax.websocket" % "javax.websocket-api" % "1.1",
       "org.glassfish.tyrus" % "tyrus-client" % "1.13",
       "org.glassfish.tyrus" % "tyrus-container-grizzly-client" % "1.13",
@@ -42,15 +42,13 @@ lazy val core = (project in file("core"))
       "org.apache.httpcomponents" % "httpclient" % "4.5.3",
       "org.apache.httpcomponents" % "fluent-hc" % "4.5.3",
 
-//      "com.twitter" %% "util-cache" % "6.39.0",
-
       "org.apache.commons" % "commons-collections4" % "4.1",
 
       "org.xerial" % "sqlite-jdbc" % "3.15.1",
 
       //test dependencies
-      "org.scalatest" %% "scalatest" % "2.2.6" % "test", //scalamock 3.2.2 is incompatible with scalatest 3.0.0
-      "org.scalamock" %% "scalamock-scalatest-support" % "3.2.2" % "test"
+      "org.scalatest" %% "scalatest" % "3.0.1" % "test", 
+      "org.scalamock" %% "scalamock-scalatest-support" % "3.6.0" % "test"
     )
   )
 
